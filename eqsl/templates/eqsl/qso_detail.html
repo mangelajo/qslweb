@@ -1,0 +1,109 @@
+{% extends "eqsl/base.html" %}
+
+{% block title %}{{ qso.call }} - QSO Detail{% endblock %}
+
+{% block content %}
+<a href="{% url 'eqsl:qso_list' %}" class="btn btn-secondary mb-3">&larr; Back to QSO List</a>
+
+<div class="text-center py-4 border-bottom mb-4">
+    <h2 class="display-4">{{ qso.call }}</h2>
+    <p class="text-muted fs-5">{{ qso.timestamp|date:"F j, Y - H:i" }} UTC</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Contact Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Callsign:</dt>
+                    <dd class="col-sm-7">{{ qso.call }}</dd>
+
+                    <dt class="col-sm-5">Name:</dt>
+                    <dd class="col-sm-7">{{ qso.name|default:"Not provided" }}</dd>
+
+                    <dt class="col-sm-5">Email:</dt>
+                    <dd class="col-sm-7">{{ qso.email|default:"Not provided" }}</dd>
+
+                    <dt class="col-sm-5">Country:</dt>
+                    <dd class="col-sm-7">{{ qso.country|default:"Not provided" }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">QSO Details</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">Frequency:</dt>
+                    <dd class="col-sm-7">{{ qso.frequency }} MHz</dd>
+
+                    <dt class="col-sm-5">Band:</dt>
+                    <dd class="col-sm-7"><span class="badge bg-info">{{ qso.band }}</span></dd>
+
+                    <dt class="col-sm-5">Mode:</dt>
+                    <dd class="col-sm-7"><span class="badge bg-success">{{ qso.mode }}</span></dd>
+
+                    <dt class="col-sm-5">RST Sent:</dt>
+                    <dd class="col-sm-7">{{ qso.rst_sent }}</dd>
+
+                    <dt class="col-sm-5">RST Received:</dt>
+                    <dd class="col-sm-7">{{ qso.rst_rcvd }}</dd>
+
+                    <dt class="col-sm-5">TX Power:</dt>
+                    <dd class="col-sm-7">{{ qso.tx_pwr }} watts</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">Station Information</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-5">My Call:</dt>
+                    <dd class="col-sm-7">{{ qso.my_call }}</dd>
+
+                    <dt class="col-sm-5">My Grid Square:</dt>
+                    <dd class="col-sm-7">{{ qso.my_gridsquare|default:"Not provided" }}</dd>
+
+                    <dt class="col-sm-5">My Rig:</dt>
+                    <dd class="col-sm-7">{{ qso.my_rig|default:"Not provided" }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    {% if qso.sota_ref or qso.pota_ref %}
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">References</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    {% if qso.sota_ref %}
+                    <dt class="col-sm-5">SOTA Reference:</dt>
+                    <dd class="col-sm-7">{{ qso.sota_ref }}</dd>
+                    {% endif %}
+
+                    {% if qso.pota_ref %}
+                    <dt class="col-sm-5">POTA Reference:</dt>
+                    <dd class="col-sm-7">{{ qso.pota_ref }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

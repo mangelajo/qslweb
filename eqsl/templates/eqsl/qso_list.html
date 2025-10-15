@@ -1,0 +1,116 @@
+{% extends "eqsl/base.html" %}
+
+{% block title %}QSO List - QSL Web{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">QSO Log <span class="badge bg-secondary">{{ page_obj.paginator.count }} total</span></h2>
+
+<div class="card bg-light mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <label for="search" class="form-label">Search</label>
+                <input type="text" class="form-control" id="search" name="q"
+                       placeholder="Call, Name, Country..." value="{{ current_search }}">
+            </div>
+            <div class="col-md-3">
+                <label for="band" class="form-label">Band</label>
+                <select class="form-select" id="band" name="band">
+                    <option value="">All Bands</option>
+                    {% for band in bands %}
+                        <option value="{{ band }}" {% if band == current_band %}selected{% endif %}>{{ band }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="mode" class="form-label">Mode</label>
+                <select class="form-select" id="mode" name="mode">
+                    <option value="">All Modes</option>
+                    {% for mode in modes %}
+                        <option value="{{ mode }}" {% if mode == current_mode %}selected{% endif %}>{{ mode }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary">Filter</button>
+                {% if current_search or current_band or current_mode %}
+                    <a href="{% url 'eqsl:qso_list' %}" class="btn btn-secondary">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if qsos %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Date/Time</th>
+                <th>Call</th>
+                <th>Name</th>
+                <th>Band</th>
+                <th>Mode</th>
+                <th>Frequency</th>
+                <th>RST S/R</th>
+                <th>Country</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for qso in qsos %}
+            <tr>
+                <td>
+                    <a href="{% url 'eqsl:qso_detail' qso.pk %}" class="text-decoration-none">
+                        {{ qso.timestamp|date:"Y-m-d H:i" }}
+                    </a>
+                </td>
+                <td><strong>{{ qso.call }}</strong></td>
+                <td>{{ qso.name|default:"-" }}</td>
+                <td><span class="badge bg-info">{{ qso.band }}</span></td>
+                <td><span class="badge bg-success">{{ qso.mode }}</span></td>
+                <td>{{ qso.frequency }} MHz</td>
+                <td>{{ qso.rst_sent }}/{{ qso.rst_rcvd }}</td>
+                <td>{{ qso.country|default:"-" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav aria-label="QSO pagination">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">Previous</a>
+            </li>
+        {% endif %}
+
+        <li class="page-item active">
+            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        </li>
+
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">Last</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="alert alert-info text-center" role="alert">
+    <h5 class="alert-heading">No QSOs found</h5>
+    {% if current_search or current_band or current_mode %}
+        <p class="mb-0"><a href="{% url 'eqsl:qso_list' %}" class="alert-link">Clear filters</a> to see all QSOs.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
