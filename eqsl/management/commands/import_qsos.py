@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from eqsl.models import QSO
-from eqsl.services import QRZAPIError, QRZLogbookAPI
+from eqsl.services import QRZLogbookAPI, QRZLogbookAPIError
 
 
 class Command(BaseCommand):
@@ -93,7 +93,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"  Errors: {error_count}"))
             self.stdout.write("=" * 50)
 
-        except QRZAPIError as e:
+        except QRZLogbookAPIError as e:
             self.stdout.write(self.style.ERROR(f"QRZ API Error: {e}"))
             return
         except Exception as e:

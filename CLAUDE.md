@@ -120,6 +120,40 @@ python manage.py import_qsos --api-key=YOUR_KEY
 python manage.py import_qsos --bookid=438677 --option=ALL --dry-run
 ```
 
+### QRZ API Usage Examples
+```python
+# QRZ XML Data API - Callsign Lookups
+from eqsl.services import QRZAPI
+
+# Initialize with credentials (uses settings by default)
+api = QRZAPI()
+
+# Look up a callsign
+data = api.lookup("W1AW")
+print(data["name"])      # "Hiram Percy Maxim"
+print(data["grid"])      # "FN31pr"
+print(data["email"])     # Email address
+print(data["lotw"])      # LoTW acceptance status
+
+# Get session info (lookup counts, subscription expiry)
+info = api.get_session_info()
+print(info["count"])     # Number of lookups today
+
+# QRZ Logbook API - QSO Import/Export
+from eqsl.services import QRZLogbookAPI
+
+# Initialize with API key
+api = QRZLogbookAPI()
+
+# Fetch QSOs
+qsos = api.fetch_qsos(option="ALL", bookid="438677")
+
+# Map QSO to model format
+for qrz_qso in qsos:
+    qso_data = api.map_qso_to_model(qrz_qso)
+    # Save to database...
+```
+
 ## Architecture
 
 ### Core Components
@@ -135,13 +169,17 @@ python manage.py import_qsos --bookid=438677 --option=ALL --dry-run
    - QSL status tracking across multiple platforms (eQSL, paper, LoTW, QRZ)
 
 3. **QRZ.com Integration**
-   - API client for QRZ.com Logbook API (located in `eqsl/services.py`)
+   - Two separate API clients in `eqsl/services/`:
+     - **QRZ XML Data API** (`qrz.py`): Callsign lookups with session management
+     - **QRZ Logbook API** (`qrzlogbook.py`): QSO import/export
    - Import QSOs from QRZ.com using management command
    - Automatic duplicate detection based on call, timestamp, and band
    - Supports multiple fetch options (ALL, MODIFIED, RANGE)
-   - Handles URL-encoded ADIF format with HTML entity decoding
+   - Logbook API handles URL-encoded ADIF format with HTML entity decoding
    - The API returns data like `RESULT=OK&COUNT=143&ADIF=&lt;field:length&gt;value`
    - Parser decodes HTML entities and extracts ADIF fields
+   - XML API manages session keys with 23-hour caching
+   - Automatic session refresh on expiration
 
 4. **Email System**
    - SMTP integration for sending eQSL cards

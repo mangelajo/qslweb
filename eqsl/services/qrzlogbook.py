@@ -1,15 +1,19 @@
 """
-Services for external API integration.
+QRZ.com Logbook API client.
+
+This module provides access to the QRZ.com Logbook API for importing QSOs.
 """
 
+import html
+import re
 import xml.etree.ElementTree as ET
 
 import requests
 from django.conf import settings
 
 
-class QRZAPIError(Exception):
-    """Exception raised for QRZ API errors."""
+class QRZLogbookAPIError(Exception):
+    """Exception raised for QRZ Logbook API errors."""
 
     pass
 
@@ -20,10 +24,10 @@ class QRZLogbookAPI:
     BASE_URL = "https://logbook.qrz.com/api"
 
     def __init__(self, api_key: str | None = None):
-        """Initialize QRZ API client."""
+        """Initialize QRZ Logbook API client."""
         self.api_key = api_key or settings.QRZ_API_KEY
         if not self.api_key:
-            raise QRZAPIError("QRZ API key is required")
+            raise QRZLogbookAPIError("QRZ API key is required")
 
     def fetch_qsos(self, option: str = "MODIFIED", bookid: str | None = None) -> list[dict]:
         """
@@ -46,7 +50,7 @@ class QRZLogbookAPI:
             response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
         except requests.RequestException as e:
-            raise QRZAPIError(f"Failed to fetch QSOs from QRZ: {e}") from e
+            raise QRZLogbookAPIError(f"Failed to fetch QSOs from QRZ: {e}") from e
 
         return self._parse_qsos(response.text)
 
@@ -70,13 +74,13 @@ class QRZLogbookAPI:
         except ET.ParseError as e:
             # Show first 200 characters of response for debugging
             preview = response_data[:200] if len(response_data) > 200 else response_data
-            raise QRZAPIError(f"Failed to parse QRZ response: {e}\nResponse preview: {preview}") from e
+            raise QRZLogbookAPIError(f"Failed to parse QRZ response: {e}\nResponse preview: {preview}") from e
 
         # Check for errors
         if root.tag == "QRZDatabase":
             error = root.find(".//ERROR")
             if error is not None:
-                raise QRZAPIError(f"QRZ API Error: {error.text}")
+                raise QRZLogbookAPIError(f"QRZ API Error: {error.text}")
 
         # Check result status
         result = root.find("RESULT")
@@ -84,7 +88,7 @@ class QRZLogbookAPI:
             status = result.get("STATUS")
             if status == "FAIL":
                 reason = result.get("REASON", "Unknown error")
-                raise QRZAPIError(f"QRZ API returned FAIL: {reason}")
+                raise QRZLogbookAPIError(f"QRZ API returned FAIL: {reason}")
 
         # Parse QSO records
         qsos = []
@@ -129,7 +133,7 @@ class QRZLogbookAPI:
             reason = "Unknown error"
             if "REASON=" in response_data:
                 reason = response_data.split("REASON=")[1].split("&")[0]
-            raise QRZAPIError(f"QRZ API returned FAIL: {reason}")
+            raise QRZLogbookAPIError(f"QRZ API returned FAIL: {reason}")
 
         if count == 0:
             return []
@@ -157,8 +161,6 @@ class QRZLogbookAPI:
         Returns:
             List of QSO dictionaries
         """
-        import html
-
         # Decode HTML entities (QRZ API returns &lt; and &gt; instead of < and >)
         adif_data = html.unescape(adif_data)
 
@@ -172,8 +174,6 @@ class QRZLogbookAPI:
 
             qso_data = {}
             # Parse ADIF fields: <FIELD:length>value
-            import re
-
             pattern = r"<(\w+):(\d+)>([^<]*)"
             matches = re.findall(pattern, record, re.IGNORECASE)
 

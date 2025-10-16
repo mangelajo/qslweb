@@ -9,7 +9,7 @@ import pytest
 from django.core.management import call_command
 
 from eqsl.models import QSO
-from eqsl.services import QRZAPIError, QRZLogbookAPI
+from eqsl.services import QRZLogbookAPI, QRZLogbookAPIError
 from tests.fixtures.qrz_responses import (
     FAIL_ADIF_RESPONSE,
     SAMPLE_ADIF_RESPONSE,
@@ -21,9 +21,9 @@ class TestQRZLogbookAPI:
 
     def test_init_without_api_key(self):
         """Test initialization without API key raises error."""
-        with patch("eqsl.services.settings") as mock_settings:
+        with patch("eqsl.services.qrzlogbook.settings") as mock_settings:
             mock_settings.QRZ_API_KEY = None
-            with pytest.raises(QRZAPIError, match="QRZ API key is required"):
+            with pytest.raises(QRZLogbookAPIError, match="QRZ API key is required"):
                 QRZLogbookAPI()
 
     def test_init_with_api_key(self):
@@ -31,7 +31,7 @@ class TestQRZLogbookAPI:
         api = QRZLogbookAPI(api_key="test_key")
         assert api.api_key == "test_key"
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_fetch_qsos_success(self, mock_get):
         """Test successful QSO fetch."""
         mock_response = MagicMock()
@@ -47,7 +47,7 @@ class TestQRZLogbookAPI:
         assert qsos[1]["call"] == "N3TEST"
         assert qsos[2]["call"] == "K4TST"
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_fetch_qsos_api_error(self, mock_get):
         """Test QSO fetch with API error."""
         mock_response = MagicMock()
@@ -56,10 +56,10 @@ class TestQRZLogbookAPI:
         mock_get.return_value = mock_response
 
         api = QRZLogbookAPI(api_key="test_key")
-        with pytest.raises(QRZAPIError, match="Invalid API key"):
+        with pytest.raises(QRZLogbookAPIError, match="Invalid API key"):
             api.fetch_qsos()
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_fetch_qsos_network_error(self, mock_get):
         """Test QSO fetch with network error."""
         import requests
@@ -67,7 +67,7 @@ class TestQRZLogbookAPI:
         mock_get.side_effect = requests.RequestException("Network error")
 
         api = QRZLogbookAPI(api_key="test_key")
-        with pytest.raises(QRZAPIError, match="Failed to fetch QSOs"):
+        with pytest.raises(QRZLogbookAPIError, match="Failed to fetch QSOs"):
             api.fetch_qsos()
 
     def test_map_qso_to_model(self):
@@ -113,7 +113,7 @@ class TestImportQSOsCommand:
         """Clear QSO table before each test."""
         QSO.objects.all().delete()
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_import_qsos_success(self, mock_get):
         """Test successful QSO import."""
         mock_response = MagicMock()
@@ -134,7 +134,7 @@ class TestImportQSOsCommand:
         assert qso1.band == "70cm"
         assert qso1.mode == "FM"
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_import_qsos_dry_run(self, mock_get):
         """Test dry run mode doesn't save QSOs."""
         mock_response = MagicMock()
@@ -150,7 +150,7 @@ class TestImportQSOsCommand:
         assert "Would import" in output
         assert QSO.objects.count() == 0
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_import_qsos_skip_duplicates(self, mock_get):
         """Test that duplicate QSOs are skipped."""
         # Create existing QSO matching first one in SAMPLE_ADIF_RESPONSE
@@ -179,7 +179,7 @@ class TestImportQSOsCommand:
         assert "Imported: 2" in output
         assert QSO.objects.count() == 3  # 1 existing + 2 new
 
-    @patch("eqsl.services.requests.get")
+    @patch("eqsl.services.qrzlogbook.requests.get")
     def test_import_qsos_api_error(self, mock_get):
         """Test handling of API errors."""
         mock_response = MagicMock()
