@@ -7,6 +7,7 @@ This module provides access to the QRZ.com Logbook API for importing QSOs.
 import html
 import re
 import xml.etree.ElementTree as ET
+from urllib.parse import unquote
 
 import requests
 from django.conf import settings
@@ -49,6 +50,8 @@ class QRZLogbookAPI:
         try:
             response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
+            # QRZ API returns ISO-8859-1 (Latin-1) encoded data
+            response.encoding = 'iso-8859-1'
         except requests.RequestException as e:
             raise QRZLogbookAPIError(f"Failed to fetch QSOs from QRZ: {e}") from e
 
@@ -151,16 +154,54 @@ class QRZLogbookAPI:
         qsos = self._parse_adif(adif_data)
         return qsos
 
+    def _fix_mixed_encoding(self, text: str) -> str:
+        """
+        Fix mixed UTF-8/ISO-8859-1 encoding in text.
+
+        QRZ database contains mixed encodings - some fields are UTF-8, some are ISO-8859-1.
+        This function detects and fixes the encoding.
+
+        Args:
+            text: Text that may have mixed encoding
+
+        Returns:
+            Properly decoded UTF-8 string
+        """
+        if not text:
+            return text
+
+        # The text has been decoded as ISO-8859-1, preserving all bytes
+        # Try to detect if it was actually UTF-8
+        try:
+            # Convert back to bytes (as ISO-8859-1)
+            text_bytes = text.encode('iso-8859-1')
+
+            # Try to decode as UTF-8
+            utf8_text = text_bytes.decode('utf-8')
+
+            # If successful and contains non-ASCII chars, it was UTF-8
+            if any(ord(c) > 127 for c in utf8_text):
+                return utf8_text
+            else:
+                # ASCII text, return as-is
+                return text
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            # Not UTF-8, was actually ISO-8859-1, return original
+            return text
+
     def _parse_adif(self, adif_data: str) -> list[dict]:
         """
         Parse ADIF data format.
 
         Args:
-            adif_data: ADIF formatted data
+            adif_data: ADIF formatted data (decoded as ISO-8859-1)
 
         Returns:
             List of QSO dictionaries
         """
+        # URL-decode the data (QRZ returns URL-encoded data)
+        adif_data = unquote(adif_data)
+
         # Decode HTML entities (QRZ API returns &lt; and &gt; instead of < and >)
         adif_data = html.unescape(adif_data)
 
@@ -178,7 +219,9 @@ class QRZLogbookAPI:
             matches = re.findall(pattern, record, re.IGNORECASE)
 
             for field_name, _length, value in matches:
-                qso_data[field_name.lower()] = value.strip()
+                # Fix mixed encoding in the value
+                fixed_value = self._fix_mixed_encoding(value.strip())
+                qso_data[field_name.lower()] = fixed_value
 
             if qso_data:
                 qsos.append(qso_data)
