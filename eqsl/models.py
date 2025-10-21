@@ -66,3 +66,48 @@ class QSO(models.Model):
 
     def __str__(self):
         return f"{self.call} on {self.band} {self.mode} at {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
+
+
+class EmailQSL(models.Model):
+    """Record of an eQSL card sent via email for a QSO."""
+
+    qso = models.ForeignKey(QSO, on_delete=models.CASCADE, related_name="email_qsls", help_text="QSO this eQSL is for")
+    card_template = models.ForeignKey(
+        CardTemplate, on_delete=models.PROTECT, related_name="email_qsls", help_text="Card template used"
+    )
+
+    # Email details
+    sent_at = models.DateTimeField(default=timezone.now, db_index=True, help_text="When the email was sent")
+    recipient_email = models.EmailField(help_text="Email address the eQSL was sent to")
+    sender_email = models.EmailField(help_text="Email address the eQSL was sent from")
+    subject = models.CharField(max_length=255, help_text="Email subject line")
+    body = models.TextField(help_text="Email body content")
+
+    # Status tracking
+    delivery_status = models.CharField(
+        max_length=20,
+        default="sent",
+        choices=[
+            ("sent", "Sent"),
+            ("delivered", "Delivered"),
+            ("failed", "Failed"),
+            ("bounced", "Bounced"),
+        ],
+        help_text="Email delivery status",
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-sent_at"]
+        verbose_name = "Email QSL"
+        verbose_name_plural = "Email QSLs"
+        indexes = [
+            models.Index(fields=["-sent_at"]),
+            models.Index(fields=["qso", "sent_at"]),
+        ]
+
+    def __str__(self):
+        return f"eQSL to {self.qso.call} sent at {self.sent_at.strftime('%Y-%m-%d %H:%M')}"

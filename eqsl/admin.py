@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import QSO, CardTemplate
+from .models import QSO, CardTemplate, EmailQSL
 
 
 @admin.register(CardTemplate)
@@ -150,3 +150,75 @@ class QSOAdmin(admin.ModelAdmin):
     def has_email(self, obj):
         """Display whether the QSO has an email address."""
         return bool(obj.email)
+
+
+@admin.register(EmailQSL)
+class EmailQSLAdmin(admin.ModelAdmin):
+    """Admin interface for EmailQSL records."""
+
+    list_display = [
+        "sent_at",
+        "qso_callsign",
+        "recipient_email",
+        "card_template",
+        "delivery_status",
+        "subject",
+    ]
+    list_filter = [
+        "delivery_status",
+        "sent_at",
+        "card_template",
+    ]
+    search_fields = [
+        "recipient_email",
+        "sender_email",
+        "subject",
+        "body",
+        "qso__call",
+    ]
+
+    # Pagination
+    list_per_page = 50
+
+    # Date hierarchy for easy filtering by date
+    date_hierarchy = "sent_at"
+
+    # Ordering
+    ordering = ["-sent_at"]
+
+    # Make most fields readonly since we don't want to edit sent emails
+    readonly_fields = [
+        "qso",
+        "card_template",
+        "sent_at",
+        "recipient_email",
+        "sender_email",
+        "subject",
+        "body",
+        "delivery_status",
+        "created_at",
+        "updated_at",
+    ]
+
+    # Fieldsets for detail view
+    fieldsets = (
+        ("QSO Information", {"fields": ("qso", "card_template")}),
+        ("Email Details", {"fields": ("sent_at", "recipient_email", "sender_email", "subject")}),
+        ("Email Content", {"fields": ("body",), "classes": ("wide",)}),
+        ("Status", {"fields": ("delivery_status",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
+
+    # Custom display methods
+    @admin.display(description="Callsign", ordering="qso__call")
+    def qso_callsign(self, obj):
+        """Display the callsign from the related QSO."""
+        return obj.qso.call
+
+    def has_add_permission(self, _request):
+        """Disable manual creation of EmailQSL records through admin."""
+        return False
+
+    def has_delete_permission(self, _request, obj=None):  # noqa: ARG002
+        """Allow deletion for cleanup purposes."""
+        return True
