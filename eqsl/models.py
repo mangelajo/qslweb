@@ -1,8 +1,9 @@
+import base64
+import io
+
+from django.core.cache import cache
 from django.db import models
 from django.utils import timezone
-from django.core.cache import cache
-import io
-import base64
 
 
 def create_example_qso():
@@ -62,7 +63,7 @@ class CardTemplate(models.Model):
         related_name="card_templates",
         null=True,  # Temporarily nullable for migration
         blank=True,
-        help_text="Render template used to generate QSL card images"
+        help_text="Render template used to generate QSL card images",
     )
     is_active = models.BooleanField(default=False, help_text="Whether this template is currently active")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -83,7 +84,7 @@ class CardTemplate(models.Model):
         Returns:
             PIL.Image.Image: The rendered card image, or None if rendering fails
         """
-        from eqsl.render import execute_render_code, RenderError
+        from eqsl.render import RenderError, execute_render_code
 
         try:
             example_qso = create_example_qso()
@@ -92,6 +93,7 @@ class CardTemplate(models.Model):
         except RenderError as e:
             # Log the error but don't crash the admin
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to render example for CardTemplate {self.name}: {e}")
             return None
@@ -129,7 +131,7 @@ class CardTemplate(models.Model):
 
         # Convert to base64 data URL
         buffer = io.BytesIO()
-        img.save(buffer, format='PNG')
+        img.save(buffer, format="PNG")
         img_str = base64.b64encode(buffer.getvalue()).decode()
         data_url = f"data:image/png;base64,{img_str}"
 

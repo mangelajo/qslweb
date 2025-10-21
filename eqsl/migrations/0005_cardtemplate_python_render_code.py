@@ -4,15 +4,17 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('eqsl', '0004_cardtemplate_html_template_cardtemplate_language'),
+        ("eqsl", "0004_cardtemplate_html_template_cardtemplate_language"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='cardtemplate',
-            name='python_render_code',
-            field=models.TextField(blank=True, help_text='Python code defining a render(card_template, qso) function that returns a PIL Image'),
+            model_name="cardtemplate",
+            name="python_render_code",
+            field=models.TextField(
+                blank=True,
+                help_text="Python code defining a render(card_template, qso) function that returns a PIL Image",
+            ),
         ),
     ]

@@ -5,15 +5,18 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('eqsl', '0005_cardtemplate_python_render_code'),
+        ("eqsl", "0005_cardtemplate_python_render_code"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='cardtemplate',
-            name='python_render_code',
-            field=models.TextField(blank=True, default=eqsl.default_render.get_default_render_code, help_text='Python code defining a render(card_template, qso) function that returns a PIL Image'),
+            model_name="cardtemplate",
+            name="python_render_code",
+            field=models.TextField(
+                blank=True,
+                default=eqsl.default_render.get_default_render_code,
+                help_text="Python code defining a render(card_template, qso) function that returns a PIL Image",
+            ),
         ),
     ]

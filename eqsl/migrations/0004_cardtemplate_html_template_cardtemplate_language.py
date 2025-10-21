@@ -4,20 +4,21 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('eqsl', '0003_emailqsl'),
+        ("eqsl", "0003_emailqsl"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='cardtemplate',
-            name='html_template',
-            field=models.TextField(blank=True, help_text='Jinja2 template for email body'),
+            model_name="cardtemplate",
+            name="html_template",
+            field=models.TextField(blank=True, help_text="Jinja2 template for email body"),
         ),
         migrations.AddField(
-            model_name='cardtemplate',
-            name='language',
-            field=models.CharField(blank=True, default='en', help_text='Language code for this template', max_length=10),
+            model_name="cardtemplate",
+            name="language",
+            field=models.CharField(
+                blank=True, default="en", help_text="Language code for this template", max_length=10
+            ),
         ),
     ]

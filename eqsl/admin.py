@@ -102,7 +102,15 @@ class RenderTemplateAdmin(admin.ModelAdmin):
 @admin.register(CardTemplate)
 class CardTemplateAdmin(admin.ModelAdmin):
     form = CardTemplateAdminForm
-    list_display = ["name", "language", "is_active", "render_template", "example_preview_thumbnail", "created_at", "updated_at"]
+    list_display = [
+        "name",
+        "language",
+        "is_active",
+        "render_template",
+        "example_preview_thumbnail",
+        "created_at",
+        "updated_at",
+    ]
     list_filter = ["is_active", "language", "render_template", "created_at"]
     search_fields = ["name", "description"]
     list_per_page = 25
@@ -113,7 +121,10 @@ class CardTemplateAdmin(admin.ModelAdmin):
         (None, {"fields": ("name", "description", "language", "is_active")}),
         ("Card Design", {"fields": ("image", "image_preview")}),
         ("Rendering", {"fields": ("render_template",)}),
-        ("Example Preview", {"fields": ("example_render_preview",), "description": "Preview of rendered card with example QSO data"}),
+        (
+            "Example Preview",
+            {"fields": ("example_render_preview",), "description": "Preview of rendered card with example QSO data"},
+        ),
         ("Email Template", {"fields": ("html_template",), "classes": ("wide",)}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
@@ -145,44 +156,45 @@ class CardTemplateAdmin(admin.ModelAdmin):
                 return format_html(
                     '<div class="preview-hover-container">'
                     '<img id="{}" src="{}" style="max-height: 80px; max-width: 200px; border: 1px solid #ccc; cursor: pointer;" title="Hover to see full size" />'
-                    '</div>'
+                    "</div>"
                     '<div id="{}_fullsize" class="preview-hover-fullsize" style="'
-                    'display: none; position: fixed; z-index: 99999; '
-                    'border: 3px solid #417690; box-shadow: 0 4px 12px rgba(0,0,0,0.3); '
+                    "display: none; position: fixed; z-index: 99999; "
+                    "border: 3px solid #417690; box-shadow: 0 4px 12px rgba(0,0,0,0.3); "
                     'background: white; padding: 5px; border-radius: 4px; pointer-events: none;">'
                     '<img src="{}" style="max-width: 400px; max-height: 300px; display: block;" />'
-                    '</div>'
-                    '<script>'
-                    '(function() {{'
+                    "</div>"
+                    "<script>"
+                    "(function() {{"
                     '  var thumb = document.getElementById("{}");'
                     '  var fullsize = document.getElementById("{}_fullsize");'
-                    '  if (thumb && fullsize) {{'
+                    "  if (thumb && fullsize) {{"
                     '    thumb.addEventListener("mouseenter", function(e) {{'
-                    '      var rect = thumb.getBoundingClientRect();'
-                    '      var left = rect.right + 10;'
-                    '      var top = rect.top;'
-                    '      if (left + 420 > window.innerWidth) {{'
-                    '        left = rect.left - 420;'
-                    '      }}'
+                    "      var rect = thumb.getBoundingClientRect();"
+                    "      var left = rect.right + 10;"
+                    "      var top = rect.top;"
+                    "      if (left + 420 > window.innerWidth) {{"
+                    "        left = rect.left - 420;"
+                    "      }}"
                     '      fullsize.style.left = left + "px";'
                     '      fullsize.style.top = top + "px";'
                     '      fullsize.style.display = "block";'
-                    '    }});'
+                    "    }});"
                     '    thumb.addEventListener("mouseleave", function(e) {{'
                     '      fullsize.style.display = "none";'
-                    '    }});'
-                    '  }}'
-                    '}})();'
-                    '</script>',
+                    "    }});"
+                    "  }}"
+                    "}})();"
+                    "</script>",
                     preview_id,
                     thumbnail_url,
                     preview_id,
                     fullsize_url,
                     preview_id,
-                    preview_id
+                    preview_id,
                 )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Failed to generate preview thumbnail: {e}")
 
         return "Error"
@@ -202,11 +214,12 @@ class CardTemplateAdmin(admin.ModelAdmin):
                     '<div style="margin: 10px 0;">'
                     '<img src="{}" style="max-width: 100%; border: 2px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" />'
                     '<p style="color: #666; font-size: 12px; margin-top: 5px;">Example QSL card rendered with sample data</p>'
-                    '</div>',
-                    data_url
+                    "</div>",
+                    data_url,
                 )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Failed to generate preview: {e}")
             return format_html('<p style="color: red;">Error rendering preview: {}</p>', str(e))
 

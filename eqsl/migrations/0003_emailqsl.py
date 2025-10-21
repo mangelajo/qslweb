@@ -6,32 +6,68 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('eqsl', '0002_qso'),
+        ("eqsl", "0002_qso"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='EmailQSL',
+            name="EmailQSL",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('sent_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, help_text='When the email was sent')),
-                ('recipient_email', models.EmailField(help_text='Email address the eQSL was sent to', max_length=254)),
-                ('sender_email', models.EmailField(help_text='Email address the eQSL was sent from', max_length=254)),
-                ('subject', models.CharField(help_text='Email subject line', max_length=255)),
-                ('body', models.TextField(help_text='Email body content')),
-                ('delivery_status', models.CharField(choices=[('sent', 'Sent'), ('delivered', 'Delivered'), ('failed', 'Failed'), ('bounced', 'Bounced')], default='sent', help_text='Email delivery status', max_length=20)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('card_template', models.ForeignKey(help_text='Card template used', on_delete=django.db.models.deletion.PROTECT, related_name='email_qsls', to='eqsl.cardtemplate')),
-                ('qso', models.ForeignKey(help_text='QSO this eQSL is for', on_delete=django.db.models.deletion.CASCADE, related_name='email_qsls', to='eqsl.qso')),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "sent_at",
+                    models.DateTimeField(
+                        db_index=True, default=django.utils.timezone.now, help_text="When the email was sent"
+                    ),
+                ),
+                ("recipient_email", models.EmailField(help_text="Email address the eQSL was sent to", max_length=254)),
+                ("sender_email", models.EmailField(help_text="Email address the eQSL was sent from", max_length=254)),
+                ("subject", models.CharField(help_text="Email subject line", max_length=255)),
+                ("body", models.TextField(help_text="Email body content")),
+                (
+                    "delivery_status",
+                    models.CharField(
+                        choices=[
+                            ("sent", "Sent"),
+                            ("delivered", "Delivered"),
+                            ("failed", "Failed"),
+                            ("bounced", "Bounced"),
+                        ],
+                        default="sent",
+                        help_text="Email delivery status",
+                        max_length=20,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "card_template",
+                    models.ForeignKey(
+                        help_text="Card template used",
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="email_qsls",
+                        to="eqsl.cardtemplate",
+                    ),
+                ),
+                (
+                    "qso",
+                    models.ForeignKey(
+                        help_text="QSO this eQSL is for",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="email_qsls",
+                        to="eqsl.qso",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Email QSL',
-                'verbose_name_plural': 'Email QSLs',
-                'ordering': ['-sent_at'],
-                'indexes': [models.Index(fields=['-sent_at'], name='eqsl_emailq_sent_at_4550fc_idx'), models.Index(fields=['qso', 'sent_at'], name='eqsl_emailq_qso_id_d6f481_idx')],
+                "verbose_name": "Email QSL",
+                "verbose_name_plural": "Email QSLs",
+                "ordering": ["-sent_at"],
+                "indexes": [
+                    models.Index(fields=["-sent_at"], name="eqsl_emailq_sent_at_4550fc_idx"),
+                    models.Index(fields=["qso", "sent_at"], name="eqsl_emailq_qso_id_d6f481_idx"),
+                ],
             },
         ),
     ]

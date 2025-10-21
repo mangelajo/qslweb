@@ -34,7 +34,7 @@ def render_template():
     return RenderTemplate(
         name="test_default_render",
         description="Test default render template",
-        python_render_code=get_default_render_code()
+        python_render_code=get_default_render_code(),
     )
 
 

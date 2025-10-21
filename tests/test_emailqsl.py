@@ -13,9 +13,7 @@ from eqsl.models import QSO, CardTemplate, EmailQSL, RenderTemplate
 def render_template(db):  # noqa: ARG001
     """Create a render template for testing."""
     return RenderTemplate.objects.create(
-        name="test_render",
-        description="Test render template",
-        python_render_code=get_default_render_code()
+        name="test_render", description="Test render template", python_render_code=get_default_render_code()
     )
 
 

@@ -5,8 +5,8 @@ from django.db import migrations
 
 def populate_render_templates(apps, schema_editor):
     """Create default and simple render templates and link existing CardTemplates."""
-    RenderTemplate = apps.get_model('eqsl', 'RenderTemplate')
-    CardTemplate = apps.get_model('eqsl', 'CardTemplate')
+    RenderTemplate = apps.get_model("eqsl", "RenderTemplate")
+    CardTemplate = apps.get_model("eqsl", "CardTemplate")
 
     # Import the default render code functions
     from eqsl.default_render import get_default_render_code, create_simple_render_code
@@ -15,32 +15,29 @@ def populate_render_templates(apps, schema_editor):
     default_template = RenderTemplate.objects.create(
         name="default",
         description="Default render template with full QSO details and decorative elements",
-        python_render_code=get_default_render_code()
+        python_render_code=get_default_render_code(),
     )
 
     # Create the "simple" render template
     simple_template = RenderTemplate.objects.create(
         name="simple",
         description="Simple render template with basic QSO information",
-        python_render_code=create_simple_render_code()
+        python_render_code=create_simple_render_code(),
     )
 
     # Link all existing CardTemplates to the "default" render template
-    CardTemplate.objects.filter(render_template__isnull=True).update(
-        render_template=default_template
-    )
+    CardTemplate.objects.filter(render_template__isnull=True).update(render_template=default_template)
 
 
 def reverse_populate_render_templates(apps, schema_editor):
     """Reverse migration - delete render templates."""
-    RenderTemplate = apps.get_model('eqsl', 'RenderTemplate')
+    RenderTemplate = apps.get_model("eqsl", "RenderTemplate")
     RenderTemplate.objects.all().delete()
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('eqsl', '0007_add_rendertemplate_model'),
+        ("eqsl", "0007_add_rendertemplate_model"),
     ]
 
     operations = [

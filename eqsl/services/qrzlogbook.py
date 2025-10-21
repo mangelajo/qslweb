@@ -51,7 +51,7 @@ class QRZLogbookAPI:
             response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
             # QRZ API returns ISO-8859-1 (Latin-1) encoded data
-            response.encoding = 'iso-8859-1'
+            response.encoding = "iso-8859-1"
         except requests.RequestException as e:
             raise QRZLogbookAPIError(f"Failed to fetch QSOs from QRZ: {e}") from e
 
@@ -174,10 +174,10 @@ class QRZLogbookAPI:
         # Try to detect if it was actually UTF-8
         try:
             # Convert back to bytes (as ISO-8859-1)
-            text_bytes = text.encode('iso-8859-1')
+            text_bytes = text.encode("iso-8859-1")
 
             # Try to decode as UTF-8
-            utf8_text = text_bytes.decode('utf-8')
+            utf8_text = text_bytes.decode("utf-8")
 
             # If successful and contains non-ASCII chars, it was UTF-8
             if any(ord(c) > 127 for c in utf8_text):

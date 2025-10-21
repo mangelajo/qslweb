@@ -38,7 +38,7 @@ def sample_render_template():
     return RenderTemplate(
         name="test_render",
         description="Test render template",
-        python_render_code="def render(card_template, qso):\n    return card_template.image"
+        python_render_code="def render(card_template, qso):\n    return card_template.image",
     )
 
 

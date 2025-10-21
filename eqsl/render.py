@@ -68,14 +68,13 @@ def with_resource_limits(max_memory_mb: int = 200, max_time_seconds: int = 10) -
             # Set memory limit (virtual memory)
             with contextlib.suppress(ValueError):
                 # Some systems don't support setting memory limits
-                resource.setrlimit(
-                    resource.RLIMIT_AS, (max_memory_mb * 1024 * 1024, max_memory_mb * 1024 * 1024)
-                )
+                resource.setrlimit(resource.RLIMIT_AS, (max_memory_mb * 1024 * 1024, max_memory_mb * 1024 * 1024))
 
             # Try to set CPU time limit with signal (only works in main thread)
             signal_available = False
             old_handler = None
             try:
+
                 def timeout_handler(_signum: int, _frame: Any) -> None:
                     raise RenderTimeoutError(f"Render execution exceeded {max_time_seconds} seconds")
 
@@ -286,9 +285,7 @@ def execute_render_code(card_template: Any, qso: Any) -> Image.Image:
 
     # Compile with RestrictedPython
     try:
-        byte_code = compile_restricted(
-            python_render_code, filename="<card_template_render>", mode="exec"
-        )
+        byte_code = compile_restricted(python_render_code, filename="<card_template_render>", mode="exec")
     except SyntaxError as e:
         raise RenderCompilationError(f"Code compilation errors: {e}") from e
 
@@ -322,8 +319,6 @@ def execute_render_code(card_template: Any, qso: Any) -> Image.Image:
 
     # Validate result is a PIL Image
     if not isinstance(result, Image.Image):
-        raise RenderExecutionError(
-            f"render() must return a PIL Image, got {type(result).__name__}"
-        )
+        raise RenderExecutionError(f"render() must return a PIL Image, got {type(result).__name__}")
 
     return result

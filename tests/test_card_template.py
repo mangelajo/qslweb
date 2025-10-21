@@ -26,9 +26,7 @@ def sample_image():
 def default_render_template():
     """Create a default render template for testing."""
     return RenderTemplate.objects.create(
-        name="test_default",
-        description="Test default render template",
-        python_render_code=get_default_render_code()
+        name="test_default", description="Test default render template", python_render_code=get_default_render_code()
     )
 
 
@@ -39,9 +37,7 @@ class TestRenderTemplate:
     def test_create_render_template(self):
         """Test creating a render template."""
         render_template = RenderTemplate.objects.create(
-            name="test_template",
-            description="Test render template",
-            python_render_code=get_default_render_code()
+            name="test_template", description="Test render template", python_render_code=get_default_render_code()
         )
 
         assert render_template.name == "test_template"
@@ -70,7 +66,7 @@ class TestCardTemplate:
             description="A test QSL card template",
             image=sample_image,
             render_template=default_render_template,
-            is_active=True
+            is_active=True,
         )
 
         assert template.name == "Test Template"
@@ -96,22 +92,25 @@ class TestCardTemplate:
         from django.db import IntegrityError
 
         with pytest.raises(IntegrityError):
-            CardTemplate.objects.create(name="Unique Template", image=sample_image, render_template=default_render_template)
+            CardTemplate.objects.create(
+                name="Unique Template", image=sample_image, render_template=default_render_template
+            )
 
     def test_card_template_with_render_template(self, sample_image):
         """Test that CardTemplate links to RenderTemplate correctly."""
         render_template = RenderTemplate.objects.create(
             name="custom_render",
             description="Custom render template",
-            python_render_code="def render(card_template, qso):\n    return card_template.image"
+            python_render_code="def render(card_template, qso):\n    return card_template.image",
         )
 
         template = CardTemplate.objects.create(
-            name="Template with Custom Render",
-            image=sample_image,
-            render_template=render_template
+            name="Template with Custom Render", image=sample_image, render_template=render_template
         )
 
         # Should have the custom render template
         assert template.render_template == render_template
-        assert template.render_template.python_render_code == "def render(card_template, qso):\n    return card_template.image"
+        assert (
+            template.render_template.python_render_code
+            == "def render(card_template, qso):\n    return card_template.image"
+        )
