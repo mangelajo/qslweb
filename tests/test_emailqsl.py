@@ -5,15 +5,27 @@ Tests for EmailQSL model.
 import pytest
 from django.utils import timezone
 
-from eqsl.models import QSO, CardTemplate, EmailQSL
+from eqsl.default_render import get_default_render_code
+from eqsl.models import QSO, CardTemplate, EmailQSL, RenderTemplate
 
 
 @pytest.fixture
-def card_template(db):  # noqa: ARG001
+def render_template(db):  # noqa: ARG001
+    """Create a render template for testing."""
+    return RenderTemplate.objects.create(
+        name="test_render",
+        description="Test render template",
+        python_render_code=get_default_render_code()
+    )
+
+
+@pytest.fixture
+def card_template(db, render_template):  # noqa: ARG001
     """Create a card template for testing."""
     return CardTemplate.objects.create(
         name="Test Template",
         description="A test QSL card template",
+        render_template=render_template,
         is_active=True,
     )
 

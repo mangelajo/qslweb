@@ -1,13 +1,14 @@
+from codemirror2.widgets import CodeMirrorEditor
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 
-from .models import QSO, CardTemplate, EmailQSL
+from .models import QSO, CardTemplate, EmailQSL, RenderTemplate
 from .render import RenderValidationError, validate_render_code
 
 
 class CardTemplateAdminForm(forms.ModelForm):
-    """Custom form for CardTemplate with python_render_code validation."""
+    """Custom form for CardTemplate."""
 
     class Meta:
         model = CardTemplate
@@ -17,18 +18,41 @@ class CardTemplateAdminForm(forms.ModelForm):
             "image",
             "language",
             "html_template",
-            "python_render_code",
+            "render_template",
             "is_active",
         ]
         widgets = {
-            "html_template": forms.Textarea(attrs={"rows": 10, "cols": 80, "class": "vLargeTextField"}),
-            "python_render_code": forms.Textarea(
+            "html_template": forms.Textarea(
                 attrs={
-                    "rows": 20,
-                    "cols": 100,
+                    "rows": 10,
                     "class": "vLargeTextField",
-                    "style": "font-family: monospace;",
+                    "style": "width: 100%;",
                 }
+            ),
+        }
+
+
+class RenderTemplateAdminForm(forms.ModelForm):
+    """Custom form for RenderTemplate with python_render_code validation."""
+
+    class Meta:
+        model = RenderTemplate
+        fields = ["name", "description", "python_render_code"]
+        widgets = {
+            "python_render_code": CodeMirrorEditor(
+                modes=["python"],
+                options={
+                    "mode": "python",
+                    "lineNumbers": True,
+                    "indentUnit": 4,
+                    "tabSize": 4,
+                    "indentWithTabs": False,
+                    "matchBrackets": True,
+                    "lineWrapping": True,
+                },
+                attrs={
+                    "style": "min-height: 400px; width: 100%;",
+                },
             ),
         }
 
@@ -36,9 +60,9 @@ class CardTemplateAdminForm(forms.ModelForm):
         """Validate the python render code before saving."""
         render_code = self.cleaned_data.get("python_render_code", "")
 
-        # If code is empty, that's fine (optional field)
+        # Code is required for RenderTemplate
         if not render_code.strip():
-            return render_code
+            raise ValidationError("Render code is required")
 
         # Validate the render code
         try:
@@ -49,28 +73,24 @@ class CardTemplateAdminForm(forms.ModelForm):
         return render_code
 
 
-@admin.register(CardTemplate)
-class CardTemplateAdmin(admin.ModelAdmin):
-    form = CardTemplateAdminForm
-    list_display = ["name", "language", "is_active", "has_render_code", "image_preview", "created_at", "updated_at"]
-    list_filter = ["is_active", "language", "created_at"]
+@admin.register(RenderTemplate)
+class RenderTemplateAdmin(admin.ModelAdmin):
+    form = RenderTemplateAdminForm
+    list_display = ["name", "description", "created_at", "updated_at"]
     search_fields = ["name", "description"]
     list_per_page = 25
-    readonly_fields = ["created_at", "updated_at", "image_preview"]
-    ordering = ["-created_at"]
+    readonly_fields = ["created_at", "updated_at"]
+    ordering = ["name"]
 
     fieldsets = (
-        (None, {"fields": ("name", "description", "language", "is_active")}),
-        ("Card Design", {"fields": ("image", "image_preview")}),
-        ("Email Template", {"fields": ("html_template",), "classes": ("wide",)}),
+        (None, {"fields": ("name", "description")}),
         (
             "Python Render Code",
             {
                 "fields": ("python_render_code",),
                 "classes": ("wide",),
                 "description": (
-                    "Optional Python code to dynamically render QSL card images. "
-                    "Must define a render(card_template, qso) function that returns a PIL Image. "
+                    "Python code defining a render(card_template, qso) function that returns a PIL Image. "
                     "Code is executed in a sandboxed environment with 10-second timeout and 200MB memory limit."
                 ),
             },
@@ -78,7 +98,27 @@ class CardTemplateAdmin(admin.ModelAdmin):
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
-    @admin.display(description="Preview")
+
+@admin.register(CardTemplate)
+class CardTemplateAdmin(admin.ModelAdmin):
+    form = CardTemplateAdminForm
+    list_display = ["name", "language", "is_active", "render_template", "example_preview_thumbnail", "created_at", "updated_at"]
+    list_filter = ["is_active", "language", "render_template", "created_at"]
+    search_fields = ["name", "description"]
+    list_per_page = 25
+    readonly_fields = ["created_at", "updated_at", "image_preview", "example_render_preview"]
+    ordering = ["-created_at"]
+
+    fieldsets = (
+        (None, {"fields": ("name", "description", "language", "is_active")}),
+        ("Card Design", {"fields": ("image", "image_preview")}),
+        ("Rendering", {"fields": ("render_template",)}),
+        ("Example Preview", {"fields": ("example_render_preview",), "description": "Preview of rendered card with example QSO data"}),
+        ("Email Template", {"fields": ("html_template",), "classes": ("wide",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
+
+    @admin.display(description="Card Image")
     def image_preview(self, obj):
         """Display a preview of the card template image."""
         if obj.image:
@@ -87,10 +127,90 @@ class CardTemplateAdmin(admin.ModelAdmin):
             return format_html('<img src="{}" style="max-height: 100px; max-width: 200px;" />', obj.image.url)
         return "No image"
 
-    @admin.display(boolean=True, description="Has Render Code")
-    def has_render_code(self, obj):
-        """Display whether the template has custom render code."""
-        return bool(obj.python_render_code and obj.python_render_code.strip())
+    @admin.display(description="Example Preview")
+    def example_preview_thumbnail(self, obj):
+        """Display a small thumbnail of the rendered example in list view with hover zoom."""
+        if not obj.pk or not obj.render_template:
+            return "—"
+
+        from django.utils.html import format_html
+
+        try:
+            thumbnail_url = obj.get_example_preview_data_url(max_width=200)
+            fullsize_url = obj.get_example_preview_data_url(max_width=400)
+
+            if thumbnail_url and fullsize_url:
+                # Use a unique ID for this preview
+                preview_id = f"preview_{obj.pk}"
+                return format_html(
+                    '<div class="preview-hover-container">'
+                    '<img id="{}" src="{}" style="max-height: 80px; max-width: 200px; border: 1px solid #ccc; cursor: pointer;" title="Hover to see full size" />'
+                    '</div>'
+                    '<div id="{}_fullsize" class="preview-hover-fullsize" style="'
+                    'display: none; position: fixed; z-index: 99999; '
+                    'border: 3px solid #417690; box-shadow: 0 4px 12px rgba(0,0,0,0.3); '
+                    'background: white; padding: 5px; border-radius: 4px; pointer-events: none;">'
+                    '<img src="{}" style="max-width: 400px; max-height: 300px; display: block;" />'
+                    '</div>'
+                    '<script>'
+                    '(function() {{'
+                    '  var thumb = document.getElementById("{}");'
+                    '  var fullsize = document.getElementById("{}_fullsize");'
+                    '  if (thumb && fullsize) {{'
+                    '    thumb.addEventListener("mouseenter", function(e) {{'
+                    '      var rect = thumb.getBoundingClientRect();'
+                    '      var left = rect.right + 10;'
+                    '      var top = rect.top;'
+                    '      if (left + 420 > window.innerWidth) {{'
+                    '        left = rect.left - 420;'
+                    '      }}'
+                    '      fullsize.style.left = left + "px";'
+                    '      fullsize.style.top = top + "px";'
+                    '      fullsize.style.display = "block";'
+                    '    }});'
+                    '    thumb.addEventListener("mouseleave", function(e) {{'
+                    '      fullsize.style.display = "none";'
+                    '    }});'
+                    '  }}'
+                    '}})();'
+                    '</script>',
+                    preview_id,
+                    thumbnail_url,
+                    preview_id,
+                    fullsize_url,
+                    preview_id,
+                    preview_id
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to generate preview thumbnail: {e}")
+
+        return "Error"
+
+    @admin.display(description="Rendered Example")
+    def example_render_preview(self, obj):
+        """Display a larger preview of the rendered example in detail view."""
+        if not obj.pk or not obj.render_template:
+            return "No render template assigned"
+
+        from django.utils.html import format_html
+
+        try:
+            data_url = obj.get_example_preview_data_url(max_width=600)
+            if data_url:
+                return format_html(
+                    '<div style="margin: 10px 0;">'
+                    '<img src="{}" style="max-width: 100%; border: 2px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" />'
+                    '<p style="color: #666; font-size: 12px; margin-top: 5px;">Example QSL card rendered with sample data</p>'
+                    '</div>',
+                    data_url
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to generate preview: {e}")
+            return format_html('<p style="color: red;">Error rendering preview: {}</p>', str(e))
+
+        return "Unable to render preview"
 
 
 @admin.register(QSO)

@@ -13,6 +13,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "requests>=2.31.0",
     "restrictedpython>=8.1",
+    "django-codemirror2>=0.2",
 ]
 
 [project.optional-dependencies]
@@ -106,3 +107,12 @@ known-first-party = ["qslweb"]
 
 [tool.django-stubs]
 django_settings_module = "qslweb.settings"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-django>=4.11.1",
+    "pytest-xdist>=3.8.0",
+    "ruff>=0.14.0",
+]

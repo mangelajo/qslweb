@@ -128,10 +128,26 @@ def sample_card():
     from django.core.files.uploadedfile import SimpleUploadedFile
     from PIL import Image
 
+    from eqsl.default_render import get_default_render_code
+    from eqsl.models import RenderTemplate
+
+    # Create render template
+    render_template = RenderTemplate.objects.create(
+        name="test_render_admin",
+        description="Test render template for admin",
+        python_render_code=get_default_render_code()
+    )
+
     img = Image.new("RGB", (100, 100), color="blue")
     img_io = io.BytesIO()
     img.save(img_io, format="PNG")
     img_io.seek(0)
     image = SimpleUploadedFile("test.png", img_io.read(), content_type="image/png")
 
-    return CardTemplate.objects.create(name="Test Card", description="A test card", image=image, is_active=True)
+    return CardTemplate.objects.create(
+        name="Test Card",
+        description="A test card",
+        image=image,
+        render_template=render_template,
+        is_active=True
+    )

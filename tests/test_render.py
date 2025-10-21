@@ -3,7 +3,7 @@
 import pytest
 from PIL import Image
 
-from eqsl.models import QSO, CardTemplate
+from eqsl.models import QSO, CardTemplate, RenderTemplate
 from eqsl.render import (
     RenderCompilationError,
     RenderExecutionError,
@@ -33,7 +33,17 @@ def sample_qso():
 
 
 @pytest.fixture
-def sample_card_template(tmp_path):
+def sample_render_template():
+    """Create a sample render template for testing."""
+    return RenderTemplate(
+        name="test_render",
+        description="Test render template",
+        python_render_code="def render(card_template, qso):\n    return card_template.image"
+    )
+
+
+@pytest.fixture
+def sample_card_template(tmp_path, sample_render_template):
     """Create a sample card template for testing."""
     # Create a simple test image
     img = Image.new("RGB", (800, 600), color="white")
@@ -44,6 +54,7 @@ def sample_card_template(tmp_path):
         name="Test Template",
         description="Test description",
         language="en",
+        render_template=sample_render_template,
     )
     template.image.name = str(img_path)
     return template
@@ -135,13 +146,13 @@ class TestExecuteRenderCode:
 
     def test_execute_empty_code(self, sample_card_template, sample_qso):
         """Test that empty code raises validation error."""
-        sample_card_template.python_render_code = ""
-        with pytest.raises(RenderValidationError, match="No render code defined"):
+        sample_card_template.render_template.python_render_code = ""
+        with pytest.raises(RenderValidationError, match="No render"):
             execute_render_code(sample_card_template, sample_qso)
 
     def test_execute_valid_simple_render(self, sample_card_template, sample_qso):
         """Test executing valid simple render code."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     from PIL import Image
     img = Image.new('RGB', (800, 600), color='white')
@@ -153,7 +164,7 @@ def render(card_template, qso):
 
     def test_execute_render_with_qso_data(self, sample_card_template, sample_qso):
         """Test executing render code that uses QSO data."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     from PIL import Image, ImageDraw
 
@@ -171,7 +182,7 @@ def render(card_template, qso):
 
     def test_execute_missing_render_function(self, sample_card_template, sample_qso):
         """Test that code without render function raises error."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def some_other_function():
     pass
 """
@@ -180,7 +191,7 @@ def some_other_function():
 
     def test_execute_render_returns_non_image(self, sample_card_template, sample_qso):
         """Test that render function returning non-Image raises error."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     return "not an image"
 """
@@ -189,7 +200,7 @@ def render(card_template, qso):
 
     def test_execute_render_with_exception(self, sample_card_template, sample_qso):
         """Test that exceptions in render function are caught."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     raise ValueError("Something went wrong")
 """
@@ -198,7 +209,7 @@ def render(card_template, qso):
 
     def test_execute_render_restricted_import(self, sample_card_template, sample_qso):
         """Test that restricted imports are blocked during execution."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 import os
 
 def render(card_template, qso):
@@ -210,7 +221,7 @@ def render(card_template, qso):
 
     def test_execute_render_restricted_file_access(self, sample_card_template, sample_qso):
         """Test that file system access is restricted."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     with open('/etc/passwd', 'r') as f:
         data = f.read()
@@ -225,7 +236,7 @@ def render(card_template, qso):
     @pytest.mark.slow
     def test_execute_render_timeout(self, sample_card_template, sample_qso):
         """Test that long-running render code times out."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     # Infinite loop
     while True:
@@ -236,7 +247,7 @@ def render(card_template, qso):
 
     def test_execute_render_syntax_error(self, sample_card_template, sample_qso):
         """Test that syntax errors are caught during compilation."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso)
     return None
 """
@@ -249,7 +260,7 @@ class TestResourceLimits:
 
     def test_memory_intensive_operation(self, sample_card_template, sample_qso):
         """Test that memory-intensive operations are handled."""
-        sample_card_template.python_render_code = """
+        sample_card_template.render_template.python_render_code = """
 def render(card_template, qso):
     from PIL import Image
 
@@ -270,24 +281,9 @@ def render(card_template, qso):
 class TestAdminValidation:
     """Tests for admin form validation."""
 
-    @pytest.fixture
-    def test_image(self):
-        """Create a test image file for form uploads."""
-        from io import BytesIO
-
-        from django.core.files.uploadedfile import SimpleUploadedFile
-
-        # Create a small test image
-        img = Image.new("RGB", (100, 100), color="white")
-        img_io = BytesIO()
-        img.save(img_io, format="PNG")
-        img_io.seek(0)
-
-        return SimpleUploadedFile("test.png", img_io.read(), content_type="image/png")
-
-    def test_admin_form_validates_render_code(self, test_image):
-        """Test that admin form validates render code on save."""
-        from eqsl.admin import CardTemplateAdminForm
+    def test_render_template_form_validates_code(self):
+        """Test that RenderTemplateAdminForm validates render code on save."""
+        from eqsl.admin import RenderTemplateAdminForm
 
         # Valid code should pass
         valid_code = """
@@ -295,49 +291,44 @@ def render(card_template, qso):
     from PIL import Image
     return Image.new('RGB', (800, 600), color='white')
 """
-        form = CardTemplateAdminForm(
+        form = RenderTemplateAdminForm(
             data={
-                "name": "Test Template",
-                "language": "en",
+                "name": "test_render",
+                "description": "Test render template",
                 "python_render_code": valid_code,
-                "is_active": False,
-            },
-            files={"image": test_image},
+            }
         )
         assert form.is_valid(), form.errors
 
-    def test_admin_form_rejects_invalid_code(self, test_image):
-        """Test that admin form rejects invalid render code."""
-        from eqsl.admin import CardTemplateAdminForm
+    def test_render_template_form_rejects_invalid_code(self):
+        """Test that RenderTemplateAdminForm rejects invalid render code."""
+        from eqsl.admin import RenderTemplateAdminForm
 
         # Invalid code (missing render function)
         invalid_code = """
 def some_other_function():
     pass
 """
-        form = CardTemplateAdminForm(
+        form = RenderTemplateAdminForm(
             data={
-                "name": "Test Template",
-                "language": "en",
+                "name": "test_render",
+                "description": "Test render template",
                 "python_render_code": invalid_code,
-                "is_active": False,
-            },
-            files={"image": test_image},
+            }
         )
         assert not form.is_valid()
         assert "python_render_code" in form.errors
 
-    def test_admin_form_allows_empty_code(self, test_image):
-        """Test that admin form allows empty render code."""
-        from eqsl.admin import CardTemplateAdminForm
+    def test_render_template_form_requires_code(self):
+        """Test that RenderTemplateAdminForm requires render code."""
+        from eqsl.admin import RenderTemplateAdminForm
 
-        form = CardTemplateAdminForm(
+        form = RenderTemplateAdminForm(
             data={
-                "name": "Test Template",
-                "language": "en",
+                "name": "test_render",
+                "description": "Test render template",
                 "python_render_code": "",
-                "is_active": False,
-            },
-            files={"image": test_image},
+            }
         )
-        assert form.is_valid(), form.errors
+        assert not form.is_valid()
+        assert "python_render_code" in form.errors

@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 
 from eqsl.default_render import create_simple_render_code, get_default_render_code
-from eqsl.models import QSO, CardTemplate
+from eqsl.models import QSO, CardTemplate, RenderTemplate
 from eqsl.render import execute_render_code
 
 
@@ -29,7 +29,17 @@ def sample_qso():
 
 
 @pytest.fixture
-def sample_card_template(tmp_path):
+def render_template():
+    """Create a render template for testing."""
+    return RenderTemplate(
+        name="test_default_render",
+        description="Test default render template",
+        python_render_code=get_default_render_code()
+    )
+
+
+@pytest.fixture
+def sample_card_template(tmp_path, render_template):
     """Create a sample card template with an image."""
     # Create a test image (1024x576 minimum size)
     img = Image.new("RGB", (1024, 576), color=(100, 150, 200))
@@ -40,6 +50,7 @@ def sample_card_template(tmp_path):
         name="Default Template",
         description="Default QSL card template",
         language="en",
+        render_template=render_template,
     )
     template.image.name = str(img_path)
     return template
@@ -50,7 +61,7 @@ class TestDefaultRenderCode:
 
     def test_default_render_code_executes(self, sample_card_template, sample_qso):
         """Test that the default render code executes successfully."""
-        sample_card_template.python_render_code = get_default_render_code()
+        sample_card_template.render_template.python_render_code = get_default_render_code()
 
         result = execute_render_code(sample_card_template, sample_qso)
 
@@ -63,7 +74,7 @@ class TestDefaultRenderCode:
         """Test default render code with POTA reference instead of SOTA."""
         sample_qso.sota_ref = ""
         sample_qso.pota_ref = "K-4566"
-        sample_card_template.python_render_code = get_default_render_code()
+        sample_card_template.render_template.python_render_code = get_default_render_code()
 
         result = execute_render_code(sample_card_template, sample_qso)
 
@@ -72,7 +83,7 @@ class TestDefaultRenderCode:
 
     def test_simple_render_code_executes(self, sample_card_template, sample_qso):
         """Test that the simple render code executes successfully."""
-        sample_card_template.python_render_code = create_simple_render_code()
+        sample_card_template.render_template.python_render_code = create_simple_render_code()
 
         result = execute_render_code(sample_card_template, sample_qso)
 
@@ -84,7 +95,7 @@ class TestDefaultRenderCode:
         sample_qso.sota_ref = ""
         sample_qso.pota_ref = ""
         sample_qso.name = ""
-        sample_card_template.python_render_code = get_default_render_code()
+        sample_card_template.render_template.python_render_code = get_default_render_code()
 
         result = execute_render_code(sample_card_template, sample_qso)
 
@@ -99,7 +110,7 @@ class TestDefaultRenderCode:
 
         template = CardTemplate(
             name="Small Template",
-            python_render_code=get_default_render_code(),
+            render_template=RenderTemplate(name="test", python_render_code=get_default_render_code()),
         )
         template.image.name = str(img_path)
 

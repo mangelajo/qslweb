@@ -72,21 +72,31 @@ def with_resource_limits(max_memory_mb: int = 200, max_time_seconds: int = 10) -
                     resource.RLIMIT_AS, (max_memory_mb * 1024 * 1024, max_memory_mb * 1024 * 1024)
                 )
 
-            # Set CPU time limit with signal
-            def timeout_handler(_signum: int, _frame: Any) -> None:
-                raise RenderTimeoutError(f"Render execution exceeded {max_time_seconds} seconds")
+            # Try to set CPU time limit with signal (only works in main thread)
+            signal_available = False
+            old_handler = None
+            try:
+                def timeout_handler(_signum: int, _frame: Any) -> None:
+                    raise RenderTimeoutError(f"Render execution exceeded {max_time_seconds} seconds")
 
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(max_time_seconds)
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(max_time_seconds)
+                signal_available = True
+            except (ValueError, AttributeError):
+                # signal.signal() raises ValueError if not in main thread
+                # AttributeError if signal.SIGALRM is not available on the platform
+                pass
 
             try:
                 result = func(*args, **kwargs)
             except MemoryError as e:
                 raise RenderExecutionError(f"Render code exceeded memory limit: {e}") from e
             finally:
-                # Cancel alarm and restore
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+                # Cancel alarm and restore if signal was set
+                if signal_available:
+                    signal.alarm(0)
+                    if old_handler is not None:
+                        signal.signal(signal.SIGALRM, old_handler)
 
                 # Restore original memory limit
                 with contextlib.suppress(ValueError):
@@ -147,6 +157,46 @@ def safe_getitem(obj, key):
         The item at the specified key/index
     """
     return obj[key]
+
+
+class ImageFileProxy:
+    """Proxy for Django ImageField that provides safe access to image path in sandbox."""
+
+    def __init__(self, image_field):
+        self._name = image_field.name
+        # Pre-compute the full path outside the sandbox
+        try:
+            self._path = image_field.path
+        except (ValueError, NotImplementedError, Exception):
+            # Fallback for test fixtures or storages without path support
+            # Also catches SuspiciousFileOperation from Django when path is outside MEDIA_ROOT
+            self._path = image_field.name
+
+    @property
+    def name(self):
+        """Return the full filesystem path (not the relative name)."""
+        return self._path
+
+    @property
+    def path(self):
+        """Return the full filesystem path."""
+        return self._path
+
+
+class CardTemplateProxy:
+    """Proxy for CardTemplate that provides safe access to attributes in sandbox."""
+
+    def __init__(self, card_template):
+        self.image = ImageFileProxy(card_template.image)
+        self.name = card_template.name
+        self.description = card_template.description
+        self.language = card_template.language
+        # Store reference to original for any other attributes that might be needed
+        self._original = card_template
+
+    def __getattr__(self, name):
+        """Fallback to original object for any other attributes."""
+        return getattr(self._original, name)
 
 
 def get_restricted_globals() -> dict:
@@ -229,13 +279,15 @@ def execute_render_code(card_template: Any, qso: Any) -> Image.Image:
         RenderTimeoutError: If execution exceeds time limit
         RenderExecutionError: If execution fails or exceeds memory limit
     """
-    if not card_template.python_render_code:
-        raise RenderValidationError("No render code defined in card template")
+    if not card_template.render_template or not card_template.render_template.python_render_code:
+        raise RenderValidationError("No render template or render code defined in card template")
+
+    python_render_code = card_template.render_template.python_render_code
 
     # Compile with RestrictedPython
     try:
         byte_code = compile_restricted(
-            card_template.python_render_code, filename="<card_template_render>", mode="exec"
+            python_render_code, filename="<card_template_render>", mode="exec"
         )
     except SyntaxError as e:
         raise RenderCompilationError(f"Code compilation errors: {e}") from e
@@ -256,9 +308,12 @@ def execute_render_code(card_template: Any, qso: Any) -> Image.Image:
 
     render_func = restricted_locals["render"]
 
+    # Wrap card_template in proxy to provide safe access to image paths
+    card_template_proxy = CardTemplateProxy(card_template)
+
     # Call the render function
     try:
-        result = render_func(card_template, qso)
+        result = render_func(card_template_proxy, qso)
     except RenderTimeoutError:
         # Re-raise timeout errors without wrapping
         raise

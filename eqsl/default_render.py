@@ -37,6 +37,7 @@ def render(card_template, qso):
         draw.rectangle(coord, outline=color, width=width)
 
     # Load and prepare base image
+    # card_template.image.name returns full path (via CardTemplateProxy in sandbox)
     img = Image.open(card_template.image.name)
     img = img.convert("RGBA")
 
@@ -182,6 +183,7 @@ def render(card_template, qso):
     from datetime import datetime
 
     # Load the base image
+    # card_template.image.name returns full path (via CardTemplateProxy in sandbox)
     img = Image.open(card_template.image.name).copy()
     draw = ImageDraw.Draw(img)
 
