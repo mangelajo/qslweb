@@ -1,19 +1,80 @@
+from django import forms
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 
 from .models import QSO, CardTemplate, EmailQSL
+from .render import RenderValidationError, validate_render_code
+
+
+class CardTemplateAdminForm(forms.ModelForm):
+    """Custom form for CardTemplate with python_render_code validation."""
+
+    class Meta:
+        model = CardTemplate
+        fields = [
+            "name",
+            "description",
+            "image",
+            "language",
+            "html_template",
+            "python_render_code",
+            "is_active",
+        ]
+        widgets = {
+            "html_template": forms.Textarea(attrs={"rows": 10, "cols": 80, "class": "vLargeTextField"}),
+            "python_render_code": forms.Textarea(
+                attrs={
+                    "rows": 20,
+                    "cols": 100,
+                    "class": "vLargeTextField",
+                    "style": "font-family: monospace;",
+                }
+            ),
+        }
+
+    def clean_python_render_code(self):
+        """Validate the python render code before saving."""
+        render_code = self.cleaned_data.get("python_render_code", "")
+
+        # If code is empty, that's fine (optional field)
+        if not render_code.strip():
+            return render_code
+
+        # Validate the render code
+        try:
+            validate_render_code(render_code)
+        except RenderValidationError as e:
+            raise ValidationError(f"Invalid render code: {e}") from e
+
+        return render_code
 
 
 @admin.register(CardTemplate)
 class CardTemplateAdmin(admin.ModelAdmin):
-    list_display = ["name", "is_active", "image_preview", "created_at", "updated_at"]
-    list_filter = ["is_active", "created_at"]
+    form = CardTemplateAdminForm
+    list_display = ["name", "language", "is_active", "has_render_code", "image_preview", "created_at", "updated_at"]
+    list_filter = ["is_active", "language", "created_at"]
     search_fields = ["name", "description"]
     list_per_page = 25
     readonly_fields = ["created_at", "updated_at", "image_preview"]
     ordering = ["-created_at"]
 
     fieldsets = (
-        (None, {"fields": ("name", "description", "image", "image_preview", "is_active")}),
+        (None, {"fields": ("name", "description", "language", "is_active")}),
+        ("Card Design", {"fields": ("image", "image_preview")}),
+        ("Email Template", {"fields": ("html_template",), "classes": ("wide",)}),
+        (
+            "Python Render Code",
+            {
+                "fields": ("python_render_code",),
+                "classes": ("wide",),
+                "description": (
+                    "Optional Python code to dynamically render QSL card images. "
+                    "Must define a render(card_template, qso) function that returns a PIL Image. "
+                    "Code is executed in a sandboxed environment with 10-second timeout and 200MB memory limit."
+                ),
+            },
+        ),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
@@ -25,6 +86,11 @@ class CardTemplateAdmin(admin.ModelAdmin):
 
             return format_html('<img src="{}" style="max-height: 100px; max-width: 200px;" />', obj.image.url)
         return "No image"
+
+    @admin.display(boolean=True, description="Has Render Code")
+    def has_render_code(self, obj):
+        """Display whether the template has custom render code."""
+        return bool(obj.python_render_code and obj.python_render_code.strip())
 
 
 @admin.register(QSO)
