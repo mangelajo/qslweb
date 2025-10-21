@@ -1,5 +1,7 @@
 # QSL Web
 
+[![CI](https://github.com/YOUR_USERNAME/qslweb/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/qslweb/actions/workflows/ci.yml)
+
 A Django application for managing eQSL card confirmations via email. This application allows you to:
 
 - Manage QSL card designs and templates
