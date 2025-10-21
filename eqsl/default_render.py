@@ -37,14 +37,7 @@ def render(card_template, qso):
         draw.rectangle(coord, outline=color, width=width)
 
     # Load and prepare base image
-    # Use .name for absolute paths (testing) or .path for uploaded files
-    try:
-        img_path = card_template.image.path
-    except Exception:
-        # Fall back to using the name directly if path validation fails
-        img_path = card_template.image.name
-
-    img = Image.open(img_path)
+    img = Image.open(card_template.image.name)
     img = img.convert("RGBA")
 
     # Validate minimum size
@@ -189,13 +182,7 @@ def render(card_template, qso):
     from datetime import datetime
 
     # Load the base image
-    # Use .name for absolute paths (testing) or .path for uploaded files
-    try:
-        img_path = card_template.image.path
-    except Exception:
-        img_path = card_template.image.name
-
-    img = Image.open(img_path).copy()
+    img = Image.open(card_template.image.name).copy()
     draw = ImageDraw.Draw(img)
 
     # Try to load a system font, fall back to default if not available
