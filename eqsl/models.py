@@ -8,6 +8,12 @@ class CardTemplate(models.Model):
     name = models.CharField(max_length=100, unique=True, help_text="Template name")
     description = models.TextField(blank=True, help_text="Description of this template")
     image = models.ImageField(upload_to="card_templates/", help_text="QSL card template image")
+    language = models.CharField(max_length=10, blank=True, default="en", help_text="Language code for this template")
+    html_template = models.TextField(blank=True, help_text="Jinja2 template for email body")
+    python_render_code = models.TextField(
+        blank=True,
+        help_text="Python code defining a render(card_template, qso) function that returns a PIL Image"
+    )
     is_active = models.BooleanField(default=False, help_text="Whether this template is currently active")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
