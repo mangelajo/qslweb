@@ -10,7 +10,11 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 from RestrictedPython import compile_restricted, safe_globals
-from RestrictedPython.Guards import guarded_iter_unpack_sequence, safer_getattr
+from RestrictedPython.Guards import (
+    guarded_iter_unpack_sequence,
+    guarded_unpack_sequence,
+    safer_getattr,
+)
 
 
 class RenderError(Exception):
@@ -119,6 +123,8 @@ def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
         "PIL.ImageDraw",
         "PIL.ImageFont",
         "io",
+        "datetime",
+        "time",
     }
 
     # Check if the module or its parent is allowed
@@ -127,6 +133,20 @@ def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
 
     # Use the real __import__ for allowed modules
     return __import__(name, globals, locals, fromlist, level)
+
+
+def safe_getitem(obj, key):
+    """
+    Safe getitem function for RestrictedPython.
+
+    Args:
+        obj: Object to get item from
+        key: Key/index to access
+
+    Returns:
+        The item at the specified key/index
+    """
+    return obj[key]
 
 
 def get_restricted_globals() -> dict:
@@ -142,8 +162,11 @@ def get_restricted_globals() -> dict:
 
     return {
         "__builtins__": restricted_builtins,
-        "_getiter_": guarded_iter_unpack_sequence,
+        "_getiter_": iter,
+        "_iter_unpack_sequence_": guarded_iter_unpack_sequence,
         "_getattr_": safer_getattr,
+        "_getitem_": safe_getitem,
+        "_unpack_sequence_": guarded_unpack_sequence,
         # PIL/Pillow modules - pre-imported for convenience
         "Image": Image,
         "ImageDraw": ImageDraw,

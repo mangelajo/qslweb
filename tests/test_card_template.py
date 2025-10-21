@@ -8,6 +8,7 @@ import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from PIL import Image
 
+from eqsl.default_render import get_default_render_code
 from eqsl.models import CardTemplate
 
 
@@ -54,3 +55,27 @@ class TestCardTemplate:
 
         with pytest.raises(IntegrityError):
             CardTemplate.objects.create(name="Unique Template", image=sample_image)
+
+    def test_card_template_default_render_code(self, sample_image):
+        """Test that python_render_code defaults to get_default_render_code() when not specified."""
+        template = CardTemplate.objects.create(
+            name="Default Render Template",
+            image=sample_image
+        )
+
+        # Should have the default render code
+        assert template.python_render_code == get_default_render_code()
+        assert "def render(card_template, qso):" in template.python_render_code
+
+    def test_card_template_custom_render_code(self, sample_image):
+        """Test that python_render_code can be overridden with custom code."""
+        custom_code = "def render(card_template, qso):\n    return card_template.image"
+        template = CardTemplate.objects.create(
+            name="Custom Render Template",
+            image=sample_image,
+            python_render_code=custom_code
+        )
+
+        # Should have the custom code, not the default
+        assert template.python_render_code == custom_code
+        assert template.python_render_code != get_default_render_code()

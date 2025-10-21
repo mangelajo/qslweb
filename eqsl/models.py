@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils import timezone
 
+from eqsl.default_render import get_default_render_code
+
 
 class CardTemplate(models.Model):
     """QSL card template with design image."""
@@ -12,6 +14,7 @@ class CardTemplate(models.Model):
     html_template = models.TextField(blank=True, help_text="Jinja2 template for email body")
     python_render_code = models.TextField(
         blank=True,
+        default=get_default_render_code,
         help_text="Python code defining a render(card_template, qso) function that returns a PIL Image"
     )
     is_active = models.BooleanField(default=False, help_text="Whether this template is currently active")
