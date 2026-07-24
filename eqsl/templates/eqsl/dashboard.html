@@ -45,8 +45,12 @@
 </div>
 
 {% if no_email_count %}
-<div class="alert alert-secondary py-2">
-    {{ no_email_count }} QSO{{ no_email_count|pluralize }} have no email address and cannot receive an eQSL yet.
+<div class="alert alert-secondary py-2 d-flex align-items-center justify-content-between">
+    <span>{{ no_email_count }} QSO{{ no_email_count|pluralize }} have no email address and cannot receive an eQSL yet.</span>
+    <form method="post" action="{% url 'eqsl:enrich_missing' %}" class="ms-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-primary">Enrich all from QRZ</button>
+    </form>
 </div>
 {% endif %}
 

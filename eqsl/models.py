@@ -265,6 +265,9 @@ class QSO(models.Model):
     pota_ref = models.CharField(max_length=20, blank=True, help_text="POTA reference")
     country = models.CharField(max_length=100, blank=True, help_text="Contact's country")
     lang = models.CharField(max_length=10, blank=True, default="en", help_text="Language code")
+    qrz_lookup_at = models.DateTimeField(
+        null=True, blank=True, help_text="When contact info was last looked up on QRZ.com"
+    )
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)

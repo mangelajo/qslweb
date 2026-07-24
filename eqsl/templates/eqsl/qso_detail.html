@@ -30,6 +30,13 @@
                     <dt class="col-sm-5">Country:</dt>
                     <dd class="col-sm-7">{{ qso.country|default:"Not provided" }}</dd>
                 </dl>
+                <form method="post" action="{% url 'eqsl:qso_enrich' qso.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-secondary">Lookup on QRZ.com</button>
+                    {% if qso.qrz_lookup_at %}
+                        <small class="text-muted ms-2">Last lookup: {{ qso.qrz_lookup_at|date:"Y-m-d H:i" }}</small>
+                    {% endif %}
+                </form>
             </div>
         </div>
     </div>

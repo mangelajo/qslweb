@@ -9,7 +9,8 @@ from django.views.generic import DetailView, ListView, TemplateView
 
 from .models import QSO, CardTemplate, EmailQSL, EmailTemplate, QSOQuerySet, SendingSettings
 from .render import RenderError, execute_render_code
-from .services import EQSLSendError, language_for_qso, send_eqsl
+from .services import EQSLSendError, QRZAPIError, language_for_qso, send_eqsl
+from .tasks import enrich_missing_emails, enrich_qso
 
 
 class DashboardView(TemplateView):
@@ -145,6 +146,54 @@ class SendEQSLView(View):
                 messages.error(request, f"Sending eQSL to {qso.call} failed: {email_qsl.error_message}")
 
         return redirect(request.POST.get("next") or "eqsl:qso_detail", pk=qso.pk)
+
+
+class EnrichQSOView(View):
+    """Fill blank contact fields on a QSO from QRZ.com (POST only)."""
+
+    def post(self, request, pk):
+        qso = get_object_or_404(QSO, pk=pk)
+
+        try:
+            result = enrich_qso(qso.pk)
+        except QRZAPIError as e:
+            messages.error(request, f"QRZ lookup failed: {e}")
+        else:
+            if result["error"]:
+                messages.warning(request, result["error"])
+            elif result["updated"]:
+                messages.success(request, f"QRZ lookup for {qso.call}: found {', '.join(result['updated'])}")
+            else:
+                messages.info(request, f"QRZ lookup for {qso.call}: nothing new to fill in")
+
+        return redirect(request.POST.get("next") or "eqsl:qso_detail", pk=qso.pk)
+
+
+class EnrichMissingView(View):
+    """Bulk-enrich all QSOs without an email address from QRZ.com (POST only)."""
+
+    def post(self, request):
+        try:
+            summary = enrich_missing_emails()
+        except QRZAPIError as e:
+            messages.error(request, f"QRZ lookup failed: {e}")
+            return redirect("eqsl:home")
+
+        parts = [f"{summary['processed']} QSOs looked up", f"{summary['emails_found']} emails found"]
+        if summary["not_found"]:
+            parts.append(f"{summary['not_found']} not on QRZ")
+        if summary["skipped_recent"]:
+            parts.append(f"{summary['skipped_recent']} skipped (recently checked)")
+        message = "QRZ enrichment: " + ", ".join(parts)
+
+        if summary["error"]:
+            messages.error(request, f"{message} — aborted: {summary['error']}")
+        elif summary["emails_found"]:
+            messages.success(request, message)
+        else:
+            messages.info(request, message)
+
+        return redirect(request.POST.get("next") or "eqsl:home")
 
 
 class QSOCardPreviewView(View):
