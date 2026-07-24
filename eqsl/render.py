@@ -4,6 +4,7 @@ import contextlib
 import io
 import resource
 import signal
+import threading
 from collections.abc import Callable
 from functools import wraps
 from typing import Any
@@ -62,13 +63,16 @@ def with_resource_limits(max_memory_mb: int = 200, max_time_seconds: int = 10) -
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # Store original limits to restore later
-            original_memory_limit = resource.getrlimit(resource.RLIMIT_AS)
-
-            # Set memory limit (virtual memory)
-            with contextlib.suppress(ValueError):
-                # Some systems don't support setting memory limits
-                resource.setrlimit(resource.RLIMIT_AS, (max_memory_mb * 1024 * 1024, max_memory_mb * 1024 * 1024))
+            # Memory limiting is process-wide, so only apply it in the main
+            # thread (in threaded servers other requests would hit the cap).
+            # Lower only the soft limit: hard limits cannot be raised back.
+            memory_limited = False
+            original_soft, original_hard = resource.getrlimit(resource.RLIMIT_AS)
+            if threading.current_thread() is threading.main_thread():
+                with contextlib.suppress(ValueError, OSError):
+                    # Some systems don't support setting memory limits
+                    resource.setrlimit(resource.RLIMIT_AS, (max_memory_mb * 1024 * 1024, original_hard))
+                    memory_limited = True
 
             # Try to set CPU time limit with signal (only works in main thread)
             signal_available = False
@@ -98,8 +102,9 @@ def with_resource_limits(max_memory_mb: int = 200, max_time_seconds: int = 10) -
                         signal.signal(signal.SIGALRM, old_handler)
 
                 # Restore original memory limit
-                with contextlib.suppress(ValueError):
-                    resource.setrlimit(resource.RLIMIT_AS, original_memory_limit)
+                if memory_limited:
+                    with contextlib.suppress(ValueError, OSError):
+                        resource.setrlimit(resource.RLIMIT_AS, (original_soft, original_hard))
 
             return result
 

@@ -108,8 +108,21 @@ jobs:
         run: uv run playwright install --with-deps chromium
 
       - name: Run UI tests
-        run: uv run pytest -m ui -v
+        # Override global addopts: --showlocals can MemoryError on huge page-HTML locals
+        run: >
+          uv run pytest -m ui -v
+          -o addopts="--strict-markers --tb=short"
+          --screenshot only-on-failure
+          --tracing retain-on-failure
         env:
           DJANGO_SETTINGS_MODULE: qslweb.settings
           SECRET_KEY: test-secret-key-for-ci
           DEBUG: 'True'
+
+      - name: Upload failure artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failures
+          path: test-results/
+          if-no-files-found: ignore
