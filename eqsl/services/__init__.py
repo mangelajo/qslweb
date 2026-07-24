@@ -6,6 +6,7 @@ This package provides clients for various amateur radio APIs:
 - QRZ.com Logbook API (QSO import/export)
 """
 
+from .mailer import EQSLSendError, compose_eqsl, language_for_qso, send_eqsl
 from .qrz import QRZAPI, QRZAPIError, QRZSession
 from .qrzlogbook import QRZLogbookAPI, QRZLogbookAPIError
 
@@ -15,4 +16,8 @@ __all__ = [
     "QRZSession",
     "QRZLogbookAPI",
     "QRZLogbookAPIError",
+    "EQSLSendError",
+    "compose_eqsl",
+    "language_for_qso",
+    "send_eqsl",
 ]

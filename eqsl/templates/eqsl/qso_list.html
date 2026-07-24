@@ -22,7 +22,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="mode" class="form-label">Mode</label>
                 <select class="form-select" id="mode" name="mode">
                     <option value="">All Modes</option>
@@ -31,9 +31,17 @@
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-2 d-flex align-items-end gap-2">
+            <div class="col-md-2">
+                <label for="eqsl_status" class="form-label">eQSL Status</label>
+                <select class="form-select" id="eqsl_status" name="eqsl_status">
+                    <option value="">All</option>
+                    <option value="needs" {% if current_eqsl_status == "needs" %}selected{% endif %}>Needs eQSL ({{ needs_eqsl_count }})</option>
+                    <option value="sent" {% if current_eqsl_status == "sent" %}selected{% endif %}>eQSL Sent</option>
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-primary">Filter</button>
-                {% if current_search or current_band or current_mode %}
+                {% if current_search or current_band or current_mode or current_eqsl_status %}
                     <a href="{% url 'eqsl:qso_list' %}" class="btn btn-secondary">Clear</a>
                 {% endif %}
             </div>
@@ -54,6 +62,7 @@
                 <th>Frequency</th>
                 <th>RST S/R</th>
                 <th>Country</th>
+                <th>eQSL</th>
             </tr>
         </thead>
         <tbody>
@@ -71,6 +80,19 @@
                 <td>{{ qso.frequency }} MHz</td>
                 <td>{{ qso.rst_sent }}/{{ qso.rst_rcvd }}</td>
                 <td>{{ qso.country|default:"-" }}</td>
+                <td>
+                    {% if qso.has_sent_eqsl %}
+                        <span class="badge bg-success">Sent</span>
+                    {% elif qso.email %}
+                        <form method="post" action="{% url 'eqsl:qso_send' qso.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Send</button>
+                        </form>
+                    {% else %}
+                        <span class="badge bg-secondary" title="No email address">No email</span>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
@@ -82,10 +104,10 @@
     <ul class="pagination justify-content-center">
         {% if page_obj.has_previous %}
             <li class="page-item">
-                <a class="page-link" href="?page=1{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">First</a>
+                <a class="page-link" href="?page=1{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}{% if current_eqsl_status %}&eqsl_status={{ current_eqsl_status }}{% endif %}">First</a>
             </li>
             <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">Previous</a>
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}{% if current_eqsl_status %}&eqsl_status={{ current_eqsl_status }}{% endif %}">Previous</a>
             </li>
         {% endif %}
 
@@ -95,10 +117,10 @@
 
         {% if page_obj.has_next %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">Next</a>
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}{% if current_eqsl_status %}&eqsl_status={{ current_eqsl_status }}{% endif %}">Next</a>
             </li>
             <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}">Last</a>
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_search %}&q={{ current_search }}{% endif %}{% if current_band %}&band={{ current_band }}{% endif %}{% if current_mode %}&mode={{ current_mode }}{% endif %}{% if current_eqsl_status %}&eqsl_status={{ current_eqsl_status }}{% endif %}">Last</a>
             </li>
         {% endif %}
     </ul>

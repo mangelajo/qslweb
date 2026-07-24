@@ -83,6 +83,89 @@
         </div>
     </div>
 
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">Send eQSL</h5>
+            </div>
+            <div class="card-body">
+                {% if default_card_template %}
+                <div class="text-center mb-3">
+                    <img src="{% url 'eqsl:qso_card_preview' qso.pk %}" alt="QSL card preview"
+                         id="card-preview" class="img-fluid rounded border" style="max-width: 400px;">
+                </div>
+                {% endif %}
+                {% if qso.email %}
+                <form method="post" action="{% url 'eqsl:qso_send' qso.pk %}">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                        <label for="card_template" class="form-label">Card template</label>
+                        <select class="form-select" id="card_template" name="card_template"
+                                onchange="document.getElementById('card-preview').src = '{% url 'eqsl:qso_card_preview' qso.pk %}?card_template=' + this.value;">
+                            {% for template in card_templates %}
+                                <option value="{{ template.pk }}" {% if template == default_card_template %}selected{% endif %}>{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email_template" class="form-label">Email template</label>
+                        <select class="form-select" id="email_template" name="email_template">
+                            {% for template in email_templates %}
+                                <option value="{{ template.pk }}" {% if template == default_email_template %}selected{% endif %}>{{ template }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        Send eQSL to {{ qso.email }}
+                    </button>
+                </form>
+                {% else %}
+                <div class="alert alert-warning mb-0">No email address for this contact.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if email_qsls %}
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">eQSL History</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Sent</th>
+                            <th>To</th>
+                            <th>Card</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for eqsl in email_qsls %}
+                        <tr>
+                            <td>{{ eqsl.sent_at|date:"Y-m-d H:i" }}</td>
+                            <td>{{ eqsl.recipient_email }}</td>
+                            <td>{{ eqsl.card_template.name }}</td>
+                            <td>
+                                {% if eqsl.delivery_status == "sent" or eqsl.delivery_status == "delivered" %}
+                                    <span class="badge bg-success">{{ eqsl.get_delivery_status_display }}</span>
+                                {% elif eqsl.delivery_status == "pending" %}
+                                    <span class="badge bg-warning text-dark">{{ eqsl.get_delivery_status_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-danger" {% if eqsl.error_message %}title="{{ eqsl.error_message }}"{% endif %}>{{ eqsl.get_delivery_status_display }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if qso.sota_ref or qso.pota_ref %}
     <div class="col-md-6">
         <div class="card h-100">

@@ -188,12 +188,12 @@ for qrz_qso in qsos:
 
 ### Django Apps Structure
 
-The codebase should be organized into Django apps:
-- `cards/` - QSL card design and image generation
-- `qso/` - QSO record management
-- `eqsl/` - eQSL sending and tracking
-- `qrz/` - QRZ.com API integration
-- `accounts/` - User authentication and profiles
+All functionality lives in a single Django app, `eqsl/`:
+- `eqsl/models.py` - QSO, CardTemplate, RenderTemplate, EmailTemplate, SendingSettings, EmailQSL
+- `eqsl/services/` - QRZ API clients (`qrz.py`, `qrzlogbook.py`) and eQSL mailer (`mailer.py`)
+- `eqsl/render.py` - Sandboxed execution of card render code
+- `eqsl/views.py` + `eqsl/templates/eqsl/` - Bootstrap frontend (QSO list/detail, sending, eQSL history)
+- `eqsl/management/commands/` - QRZ import command(s)
 
 ### Background Tasks
 

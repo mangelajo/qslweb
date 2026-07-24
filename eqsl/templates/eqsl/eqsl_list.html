@@ -1,0 +1,96 @@
+{% extends "eqsl/base.html" %}
+
+{% block title %}Sent eQSLs - QSL Web{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Sent eQSLs <span class="badge bg-secondary">{{ page_obj.paginator.count }} total</span></h2>
+
+<div class="card bg-light mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status">
+                    <option value="">All</option>
+                    {% for status in statuses %}
+                        <option value="{{ status }}" {% if status == current_status %}selected{% endif %}>{{ status|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary">Filter</button>
+                {% if current_status %}
+                    <a href="{% url 'eqsl:eqsl_list' %}" class="btn btn-secondary">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if email_qsls %}
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead class="table-dark">
+            <tr>
+                <th>Sent</th>
+                <th>Call</th>
+                <th>Recipient</th>
+                <th>Subject</th>
+                <th>Card</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for eqsl in email_qsls %}
+            <tr>
+                <td>{{ eqsl.sent_at|date:"Y-m-d H:i" }}</td>
+                <td>
+                    <a href="{% url 'eqsl:qso_detail' eqsl.qso.pk %}" class="text-decoration-none">
+                        <strong>{{ eqsl.qso.call }}</strong>
+                    </a>
+                </td>
+                <td>{{ eqsl.recipient_email }}</td>
+                <td>{{ eqsl.subject }}</td>
+                <td>{{ eqsl.card_template.name }}</td>
+                <td>
+                    {% if eqsl.delivery_status == "sent" or eqsl.delivery_status == "delivered" %}
+                        <span class="badge bg-success">{{ eqsl.get_delivery_status_display }}</span>
+                    {% elif eqsl.delivery_status == "pending" %}
+                        <span class="badge bg-warning text-dark">{{ eqsl.get_delivery_status_display }}</span>
+                    {% else %}
+                        <span class="badge bg-danger" {% if eqsl.error_message %}title="{{ eqsl.error_message }}"{% endif %}>{{ eqsl.get_delivery_status_display }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav aria-label="eQSL pagination">
+    <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Previous</a>
+            </li>
+        {% endif %}
+        <li class="page-item active">
+            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_status %}&status={{ current_status }}{% endif %}">Next</a>
+            </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="alert alert-info text-center" role="alert">
+    <h5 class="alert-heading">No eQSLs sent yet</h5>
+    <p class="mb-0">Send your first eQSL from the <a href="{% url 'eqsl:qso_list' %}?eqsl_status=needs" class="alert-link">Needs eQSL</a> queue.</p>
+</div>
+{% endif %}
+{% endblock %}

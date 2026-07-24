@@ -3,7 +3,7 @@ from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 
-from .models import QSO, CardTemplate, EmailQSL, RenderTemplate
+from .models import QSO, CardTemplate, EmailQSL, EmailTemplate, RenderTemplate, SendingSettings
 from .render import RenderValidationError, validate_render_code
 
 
@@ -283,7 +283,34 @@ class QSOAdmin(admin.ModelAdmin):
     )
 
     # Admin actions
-    actions = ["export_selected_qsos"]
+    actions = ["export_selected_qsos", "send_eqsl_action"]
+
+    @admin.action(description="Send eQSL for selected QSOs")
+    def send_eqsl_action(self, request, queryset):
+        """Send an eQSL email for each selected QSO with an email address."""
+        from django.contrib import messages
+
+        from .services import EQSLSendError, send_eqsl
+
+        sent = 0
+        failed = 0
+        for qso in queryset:
+            try:
+                email_qsl = send_eqsl(qso)
+            except EQSLSendError as e:
+                failed += 1
+                self.message_user(request, f"{qso.call}: {e}", level=messages.ERROR)
+                continue
+            if email_qsl.delivery_status == "sent":
+                sent += 1
+            else:
+                failed += 1
+                self.message_user(request, f"{qso.call}: {email_qsl.error_message}", level=messages.ERROR)
+
+        if sent:
+            self.message_user(request, f"{sent} eQSL(s) sent successfully.")
+        if failed:
+            self.message_user(request, f"{failed} eQSL(s) failed.", level=messages.WARNING)
 
     @admin.action(description="Export selected QSOs as CSV")
     def export_selected_qsos(self, request, queryset):
@@ -389,22 +416,24 @@ class EmailQSLAdmin(admin.ModelAdmin):
     readonly_fields = [
         "qso",
         "card_template",
+        "email_template",
         "sent_at",
         "recipient_email",
         "sender_email",
         "subject",
         "body",
         "delivery_status",
+        "error_message",
         "created_at",
         "updated_at",
     ]
 
     # Fieldsets for detail view
     fieldsets = (
-        ("QSO Information", {"fields": ("qso", "card_template")}),
+        ("QSO Information", {"fields": ("qso", "card_template", "email_template")}),
         ("Email Details", {"fields": ("sent_at", "recipient_email", "sender_email", "subject")}),
         ("Email Content", {"fields": ("body",), "classes": ("wide",)}),
-        ("Status", {"fields": ("delivery_status",)}),
+        ("Status", {"fields": ("delivery_status", "error_message")}),
         ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
@@ -421,3 +450,35 @@ class EmailQSLAdmin(admin.ModelAdmin):
     def has_delete_permission(self, _request, obj=None):  # noqa: ARG002
         """Allow deletion for cleanup purposes."""
         return True
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    """Admin interface for email templates."""
+
+    list_display = ["name", "language", "subject", "is_active", "is_default", "updated_at"]
+    list_filter = ["language", "is_active", "is_default"]
+    search_fields = ["name", "subject", "body"]
+    readonly_fields = ["created_at", "updated_at"]
+
+    fieldsets = (
+        (None, {"fields": ("name", "language", "is_active", "is_default")}),
+        ("Content", {"fields": ("subject", "body"), "classes": ("wide",)}),
+        ("Timestamps", {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
+    )
+
+
+@admin.register(SendingSettings)
+class SendingSettingsAdmin(admin.ModelAdmin):
+    """Admin interface for the sending settings singleton."""
+
+    list_display = ["__str__", "from_name", "default_card_template", "batch_size", "delay_between_emails_s"]
+    readonly_fields = ["created_at", "updated_at"]
+
+    def has_add_permission(self, _request):
+        """Only allow creating the singleton if it doesn't exist yet."""
+        return not SendingSettings.objects.exists()
+
+    def has_delete_permission(self, _request, obj=None):  # noqa: ARG002
+        """Prevent deleting the settings singleton."""
+        return False

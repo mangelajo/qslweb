@@ -141,6 +141,101 @@ class CardTemplate(models.Model):
         return data_url
 
 
+class EmailTemplate(models.Model):
+    """Email template for eQSL messages, one per language."""
+
+    LANGUAGE_CHOICES = [
+        ("en", "English"),
+        ("es", "Spanish"),
+        ("fr", "French"),
+    ]
+
+    name = models.CharField(max_length=100, help_text="Template name")
+    language = models.CharField(max_length=10, choices=LANGUAGE_CHOICES, default="en", help_text="Template language")
+    subject = models.CharField(max_length=255, help_text="Email subject (Django template syntax)")
+    body = models.TextField(help_text="Email HTML body (Django template syntax, {{ cid }} for the inline card image)")
+    is_active = models.BooleanField(default=True, help_text="Whether this template can be used")
+    is_default = models.BooleanField(default=False, help_text="Default template for this language")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["language", "name"]
+        unique_together = [["language", "name"]]
+        verbose_name = "Email Template"
+        verbose_name_plural = "Email Templates"
+
+    def __str__(self):
+        return f"{self.name} ({self.get_language_display()})"
+
+    def save(self, *args, **kwargs):
+        """Ensure only one default template per language."""
+        if self.is_default:
+            EmailTemplate.objects.filter(language=self.language, is_default=True).exclude(pk=self.pk).update(
+                is_default=False
+            )
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def default_for_language(cls, language):
+        """Get the default active template for a language, falling back to English."""
+        template = cls.objects.filter(language=language, is_default=True, is_active=True).first()
+        if template is None and language != "en":
+            template = cls.objects.filter(language="en", is_default=True, is_active=True).first()
+        return template
+
+
+class SendingSettings(models.Model):
+    """Singleton settings for eQSL sending."""
+
+    from_name = models.CharField(max_length=100, default="Your Friendly Ham", help_text="Sender display name")
+    reply_to_email = models.EmailField(blank=True, help_text="Reply-To address (optional)")
+    default_card_template = models.ForeignKey(
+        CardTemplate,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="Card template used when none is specified",
+    )
+    batch_size = models.PositiveIntegerField(default=10, help_text="Maximum emails per batch")
+    delay_between_emails_s = models.PositiveIntegerField(default=5, help_text="Delay between emails in seconds")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Sending Settings"
+        verbose_name_plural = "Sending Settings"
+
+    def __str__(self):
+        return "eQSL Sending Settings"
+
+    def save(self, *args, **kwargs):
+        """Enforce singleton."""
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_settings(cls):
+        """Get or create the singleton settings instance."""
+        settings, _ = cls.objects.get_or_create(pk=1)
+        return settings
+
+
+class QSOQuerySet(models.QuerySet):
+    """QuerySet with eQSL status helpers."""
+
+    SENT_STATUSES = ("sent", "delivered")
+
+    def needs_eqsl(self):
+        """QSOs with an email address and no successfully sent eQSL."""
+        return self.exclude(email="").exclude(email_qsls__delivery_status__in=self.SENT_STATUSES)
+
+    def eqsl_sent(self):
+        """QSOs with at least one successfully sent eQSL."""
+        return self.filter(email_qsls__delivery_status__in=self.SENT_STATUSES).distinct()
+
+
 class QSO(models.Model):
     """Amateur radio contact (QSO) record."""
 
@@ -175,6 +270,8 @@ class QSO(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    objects = QSOQuerySet.as_manager()
+
     class Meta:
         ordering = ["-timestamp"]
         verbose_name = "QSO"
@@ -187,6 +284,11 @@ class QSO(models.Model):
     def __str__(self):
         return f"{self.call} on {self.band} {self.mode} at {self.timestamp.strftime('%Y-%m-%d %H:%M')}"
 
+    @property
+    def eqsl_sent(self):
+        """Whether an eQSL has been successfully sent for this QSO."""
+        return self.email_qsls.filter(delivery_status__in=QSOQuerySet.SENT_STATUSES).exists()
+
 
 class EmailQSL(models.Model):
     """Record of an eQSL card sent via email for a QSO."""
@@ -194,6 +296,14 @@ class EmailQSL(models.Model):
     qso = models.ForeignKey(QSO, on_delete=models.CASCADE, related_name="email_qsls", help_text="QSO this eQSL is for")
     card_template = models.ForeignKey(
         CardTemplate, on_delete=models.PROTECT, related_name="email_qsls", help_text="Card template used"
+    )
+    email_template = models.ForeignKey(
+        EmailTemplate,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="email_qsls",
+        help_text="Email template used",
     )
 
     # Email details
@@ -208,6 +318,7 @@ class EmailQSL(models.Model):
         max_length=20,
         default="sent",
         choices=[
+            ("pending", "Pending"),
             ("sent", "Sent"),
             ("delivered", "Delivered"),
             ("failed", "Failed"),
@@ -215,6 +326,7 @@ class EmailQSL(models.Model):
         ],
         help_text="Email delivery status",
     )
+    error_message = models.TextField(blank=True, help_text="Error details if sending failed")
 
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True)
