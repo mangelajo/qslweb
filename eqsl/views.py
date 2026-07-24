@@ -21,7 +21,8 @@ from .services import (
     language_for_qso,
     send_eqsl,
 )
-from .tasks import enrich_missing_emails, enrich_qso, send_batch
+from .services.lotw import LOTWAPIError
+from .tasks import enrich_missing_emails, enrich_qso, send_batch, sync_lotw
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +195,28 @@ class ADIFImportView(TemplateView):
         return redirect("eqsl:qso_list")
 
 
+class LOTWSyncView(View):
+    """Import QSOs from LoTW (POST only)."""
+
+    def post(self, request):
+        full = bool(request.POST.get("full"))
+        try:
+            summary = sync_lotw(full=full)
+        except (LOTWAPIError, ADIFImportError) as e:
+            messages.error(request, f"LoTW sync failed: {e}")
+            return redirect("eqsl:adif_import")
+
+        message = (
+            f"LoTW sync: {summary['imported']} imported, "
+            f"{summary['skipped']} already known ({summary['total']} in report)"
+        )
+        if summary["errors"]:
+            messages.warning(request, message + f" — {len(summary['errors'])} records had errors")
+        else:
+            messages.success(request, message)
+        return redirect("eqsl:qso_list" if summary["imported"] else "eqsl:adif_import")
+
+
 class SendingSettingsForm(forms.ModelForm):
     """Form for the settings page, with masked credential inputs."""
 
@@ -214,11 +237,14 @@ class SendingSettingsForm(forms.ModelForm):
             "qrz_username",
             "qrz_password",
             "qrz_api_key",
+            "lotw_username",
+            "lotw_password",
         ]
         widgets = {
             "smtp_password": forms.PasswordInput(render_value=True),
             "qrz_password": forms.PasswordInput(render_value=True),
             "qrz_api_key": forms.PasswordInput(render_value=True),
+            "lotw_password": forms.PasswordInput(render_value=True),
         }
 
     def __init__(self, *args, **kwargs):

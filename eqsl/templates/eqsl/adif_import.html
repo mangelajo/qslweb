@@ -26,9 +26,27 @@
 </form>
 
 <hr class="my-4">
+
+<h5>Sync from LoTW</h5>
+<p class="text-muted">
+    Downloads your QSO records from ARRL Logbook of The World using the
+    credentials from the <a href="{% url 'eqsl:settings' %}">Settings</a> page.
+    Incremental after the first sync.
+</p>
+<form method="post" action="{% url 'eqsl:lotw_sync' %}" class="d-flex align-items-center gap-3">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-outline-primary">Sync from LoTW</button>
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="full" name="full" value="1">
+        <label class="form-check-label" for="full">Full sync (entire logbook)</label>
+    </div>
+</form>
+
+<hr class="my-4">
 <p class="text-muted small mb-0">
     You can also import from the command line:
-    <code>python manage.py import_adif yourlog.adi [--dry-run]</code>
-    or sync from QRZ.com with <code>python manage.py import_qsos</code>.
+    <code>python manage.py import_adif yourlog.adi [--dry-run]</code>,
+    sync from QRZ.com with <code>python manage.py import_qsos</code>,
+    or from LoTW with <code>python manage.py import_lotw</code>.
 </p>
 {% endblock %}

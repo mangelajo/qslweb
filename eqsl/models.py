@@ -208,6 +208,11 @@ class SendingSettings(models.Model):
     qrz_username = models.CharField(max_length=100, blank=True, help_text="QRZ.com username (blank = use .env)")
     qrz_password = models.CharField(max_length=255, blank=True, help_text="QRZ.com password (blank = use .env)")
     qrz_api_key = models.CharField(max_length=100, blank=True, help_text="QRZ Logbook API key (blank = use .env)")
+
+    # LoTW credentials (blank = use .env)
+    lotw_username = models.CharField(max_length=100, blank=True, help_text="LoTW username (blank = use .env)")
+    lotw_password = models.CharField(max_length=255, blank=True, help_text="LoTW password (blank = use .env)")
+    lotw_last_sync = models.DateTimeField(null=True, blank=True, help_text="Last successful LoTW sync")
     default_card_template = models.ForeignKey(
         CardTemplate,
         on_delete=models.SET_NULL,
@@ -260,6 +265,15 @@ class SendingSettings(models.Model):
             "username": self.qrz_username or django_settings.QRZ_USERNAME,
             "password": self.qrz_password or django_settings.QRZ_PASSWORD,
             "api_key": self.qrz_api_key or django_settings.QRZ_API_KEY,
+        }
+
+    def effective_lotw(self):
+        """LoTW credentials with .env fallback for blank fields."""
+        from django.conf import settings as django_settings
+
+        return {
+            "username": self.lotw_username or django_settings.LOTW_USERNAME,
+            "password": self.lotw_password or django_settings.LOTW_PASSWORD,
         }
 
 

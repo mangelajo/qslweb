@@ -7,6 +7,7 @@ This package provides clients for various amateur radio APIs:
 """
 
 from .importer import ADIFImportError, import_adif_content, import_qso_dict, map_adif_record
+from .lotw import LOTWAPIError, fetch_lotw_adif
 from .mailer import EQSLSendError, compose_eqsl, language_for_qso, send_eqsl
 from .qrz import QRZAPI, QRZAPIError, QRZSession
 from .qrzlogbook import QRZLogbookAPI, QRZLogbookAPIError
@@ -25,4 +26,6 @@ __all__ = [
     "import_adif_content",
     "import_qso_dict",
     "map_adif_record",
+    "LOTWAPIError",
+    "fetch_lotw_adif",
 ]

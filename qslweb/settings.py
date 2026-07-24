@@ -173,6 +173,10 @@ QRZ_API_KEY = os.getenv("QRZ_API_KEY", "")
 QRZ_USERNAME = os.getenv("QRZ_USERNAME", "")
 QRZ_PASSWORD = os.getenv("QRZ_PASSWORD", "")
 
+# LoTW (Logbook of The World) Configuration
+LOTW_USERNAME = os.getenv("LOTW_USERNAME", "")
+LOTW_PASSWORD = os.getenv("LOTW_PASSWORD", "")
+
 # SMTP Configuration
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("SMTP_SERVER", "localhost")

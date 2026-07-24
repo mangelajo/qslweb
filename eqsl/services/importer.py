@@ -23,6 +23,29 @@ class ADIFImportError(Exception):
     pass
 
 
+# Approximate band-start frequencies (MHz), used when a record has no
+# FREQ field (common in LoTW reports)
+BAND_DEFAULT_FREQ = {
+    "160m": 1.8,
+    "80m": 3.5,
+    "60m": 5.35,
+    "40m": 7.0,
+    "30m": 10.1,
+    "20m": 14.0,
+    "17m": 18.068,
+    "15m": 21.0,
+    "12m": 24.89,
+    "10m": 28.0,
+    "6m": 50.0,
+    "4m": 70.0,
+    "2m": 144.0,
+    "1.25m": 222.0,
+    "70cm": 432.0,
+    "33cm": 902.0,
+    "23cm": 1240.0,
+}
+
+
 def import_qso_dict(qso_data, dry_run=False):
     """
     Create a QSO from mapped model data unless it already exists.
@@ -64,6 +87,17 @@ def _adif_timestamp(record):
     return naive.replace(tzinfo=UTC)
 
 
+def _record_frequency(record):
+    """FREQ field as float, falling back to the band-start frequency."""
+    freq = record.get("FREQ")
+    if freq:
+        return float(freq)
+    band = record.get("BAND", "").lower()
+    if band in BAND_DEFAULT_FREQ:
+        return BAND_DEFAULT_FREQ[band]
+    raise KeyError("FREQ")
+
+
 def map_adif_record(record, default_my_call=""):
     """
     Map a raw ADIF record dict (upper-case keys) to QSO model fields.
@@ -85,7 +119,7 @@ def map_adif_record(record, default_my_call=""):
         "call": record["CALL"],
         "name": record.get("NAME", ""),
         "email": record.get("EMAIL", ""),
-        "frequency": float(record["FREQ"]),
+        "frequency": _record_frequency(record),
         "band": record["BAND"],
         "mode": record["MODE"],
         "rst_sent": record.get("RST_SENT", "599"),

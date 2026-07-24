@@ -12,7 +12,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from eqsl.models import QSO, SendingSettings
-from eqsl.services import QRZAPI, EQSLSendError, QRZAPIError, send_eqsl
+from eqsl.services import QRZAPI, EQSLSendError, QRZAPIError, fetch_lotw_adif, import_adif_content, send_eqsl
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,41 @@ def send_batch(qso_ids=None, limit=None):
             summary["errors"].append(f"{qso.call}: {email_qsl.error_message}")
 
     logger.info(f"Batch send finished: {summary['sent']} sent, {summary['failed']} failed")
+    return summary
+
+
+def sync_lotw(full=False, dry_run=False):
+    """
+    Import QSOs from the user's LoTW logbook.
+
+    Incremental by default: fetches only records LoTW received since the
+    last successful sync (with a one-day overlap for safety). Duplicates
+    against QRZ/ADIF-imported QSOs are skipped by the shared importer.
+
+    Args:
+        full: If True, fetch the complete logbook instead of incremental
+        dry_run: If True, parse and count without saving
+
+    Returns:
+        dict: import summary from import_adif_content
+
+    Raises:
+        LOTWAPIError: On credential or download problems
+        ADIFImportError: If the report cannot be parsed
+    """
+    settings_obj = SendingSettings.get_settings()
+    since = None
+    if not full and settings_obj.lotw_last_sync:
+        since = settings_obj.lotw_last_sync - timedelta(days=1)
+
+    content = fetch_lotw_adif(since=since)
+    default_my_call = settings_obj.effective_lotw()["username"].upper()
+    summary = import_adif_content(content, default_my_call=default_my_call, dry_run=dry_run)
+
+    if not dry_run:
+        settings_obj.lotw_last_sync = timezone.now()
+        settings_obj.save(update_fields=["lotw_last_sync", "updated_at"])
+
     return summary
 
 
