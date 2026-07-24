@@ -6,14 +6,60 @@ views today and be enqueued via django-q2's async_task later.
 """
 
 import logging
+import time
 from datetime import timedelta
 
 from django.utils import timezone
 
-from eqsl.models import QSO
-from eqsl.services import QRZAPI, QRZAPIError
+from eqsl.models import QSO, SendingSettings
+from eqsl.services import QRZAPI, EQSLSendError, QRZAPIError, send_eqsl
 
 logger = logging.getLogger(__name__)
+
+
+def send_batch(qso_ids=None, limit=None):
+    """
+    Send eQSLs for a batch of QSOs, pausing between emails.
+
+    Args:
+        qso_ids: Specific QSO primary keys to send for; None sends the
+            needs-eQSL queue
+        limit: Maximum number to send (defaults to SendingSettings.batch_size)
+
+    Returns:
+        dict: {"attempted": int, "sent": int, "failed": int, "errors": [str]}
+    """
+    settings_obj = SendingSettings.get_settings()
+    if limit is None:
+        limit = settings_obj.batch_size
+    delay = settings_obj.delay_between_emails_s
+
+    if qso_ids is None:
+        qsos = list(QSO.objects.needs_eqsl().order_by("-timestamp")[:limit])
+    else:
+        qsos = list(QSO.objects.filter(pk__in=qso_ids)[:limit])
+
+    summary = {"attempted": len(qsos), "sent": 0, "failed": 0, "errors": []}
+
+    for index, qso in enumerate(qsos):
+        if index and delay:
+            time.sleep(delay)
+        try:
+            email_qsl = send_eqsl(qso)
+        except EQSLSendError as e:
+            summary["failed"] += 1
+            summary["errors"].append(f"{qso.call}: {e}")
+            logger.error(f"Batch send failed for {qso.call}: {e}")
+            continue
+        if email_qsl.delivery_status == "sent":
+            summary["sent"] += 1
+        else:
+            summary["failed"] += 1
+            summary["errors"].append(f"{qso.call}: {email_qsl.error_message}")
+
+    logger.info(f"Batch send finished: {summary['sent']} sent, {summary['failed']} failed")
+    return summary
+
 
 # Fields enrichment may fill on a QSO, mapped from QRZ lookup keys
 ENRICHABLE_FIELDS = {

@@ -18,6 +18,17 @@ class QRZAPIError(Exception):
     pass
 
 
+def _db_qrz_credentials() -> dict:
+    """QRZ credentials from the in-app SendingSettings, if available."""
+    try:
+        from eqsl.models import SendingSettings
+
+        return SendingSettings.get_settings().effective_qrz()
+    except Exception:
+        # Database not ready (migrations, standalone use): fall back to env
+        return {}
+
+
 class QRZSession:
     """
     QRZ XML API session manager.
@@ -36,8 +47,12 @@ class QRZSession:
             password: QRZ password (defaults to settings.QRZ_PASSWORD)
             agent: User agent string to identify client software
         """
-        self.username = username or settings.QRZ_USERNAME
-        self.password = password or settings.QRZ_PASSWORD
+        if not username or not password:
+            db_creds = _db_qrz_credentials()
+            username = username or db_creds.get("username") or settings.QRZ_USERNAME
+            password = password or db_creds.get("password") or settings.QRZ_PASSWORD
+        self.username = username
+        self.password = password
         self.agent = agent
 
         if not self.username or not self.password:

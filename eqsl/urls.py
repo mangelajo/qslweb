@@ -5,6 +5,7 @@ URL configuration for eqsl app.
 from django.urls import path
 
 from .views import (
+    BatchSendView,
     DashboardView,
     EnrichMissingView,
     EnrichQSOView,
@@ -13,6 +14,9 @@ from .views import (
     QSODetailView,
     QSOListView,
     SendEQSLView,
+    SettingsView,
+    TestEmailView,
+    TestQRZView,
 )
 
 app_name = "eqsl"
@@ -26,4 +30,8 @@ urlpatterns = [
     path("qsos/enrich-missing/", EnrichMissingView.as_view(), name="enrich_missing"),
     path("qsos/<int:pk>/card.png", QSOCardPreviewView.as_view(), name="qso_card_preview"),
     path("eqsls/", EQSLListView.as_view(), name="eqsl_list"),
+    path("eqsls/send-batch/", BatchSendView.as_view(), name="batch_send"),
+    path("settings/", SettingsView.as_view(), name="settings"),
+    path("settings/test-email/", TestEmailView.as_view(), name="test_email"),
+    path("settings/test-qrz/", TestQRZView.as_view(), name="test_qrz"),
 ]

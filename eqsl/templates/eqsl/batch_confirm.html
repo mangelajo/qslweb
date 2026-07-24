@@ -1,0 +1,43 @@
+{% extends "eqsl/base.html" %}
+
+{% block title %}Batch Send - QSL Web{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Batch Send eQSLs</h2>
+
+{% if queue_count %}
+<div class="alert alert-warning">
+    <h5 class="alert-heading">You are about to email {{ will_send }} station{{ will_send|pluralize }}</h5>
+    <p class="mb-0">
+        {{ queue_count }} QSO{{ queue_count|pluralize }} currently need an eQSL.
+        This run will send up to <strong>{{ batch_size }}</strong> emails
+        (the batch size), pausing <strong>{{ delay }}s</strong> between each.
+        {% if remaining %}
+        Run it again afterwards for the remaining {{ remaining }} — or adjust the batch size in Settings.
+        {% endif %}
+    </p>
+</div>
+
+<dl class="row">
+    <dt class="col-sm-3">In queue</dt>
+    <dd class="col-sm-9">{{ queue_count }} QSOs</dd>
+    <dt class="col-sm-3">This run</dt>
+    <dd class="col-sm-9">{{ will_send }} emails</dd>
+    <dt class="col-sm-3">Delay between emails</dt>
+    <dd class="col-sm-9">{{ delay }} seconds</dd>
+</dl>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Send {{ will_send }} eQSL{{ will_send|pluralize }} now</button>
+    <a href="{% url 'eqsl:qso_list' %}?eqsl_status=needs" class="btn btn-secondary">Review queue first</a>
+    <a href="{% url 'eqsl:home' %}" class="btn btn-outline-secondary">Cancel</a>
+</form>
+{% else %}
+<div class="alert alert-success">
+    <h5 class="alert-heading">Queue is empty</h5>
+    <p class="mb-0">Every QSO with an email address already has an eQSL sent. Nice work!</p>
+</div>
+<a href="{% url 'eqsl:home' %}" class="btn btn-primary">Back to dashboard</a>
+{% endif %}
+{% endblock %}

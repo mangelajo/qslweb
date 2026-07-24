@@ -1,0 +1,106 @@
+{% extends "eqsl/base.html" %}
+
+{% block title %}Settings - QSL Web{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Settings</h2>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="alert {% if smtp_configured %}alert-success{% else %}alert-warning{% endif %} py-2 mb-0">
+            SMTP: {% if smtp_configured %}configured{% else %}not configured — emails cannot be sent{% endif %}
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="alert {% if qrz_configured %}alert-success{% else %}alert-warning{% endif %} py-2 mb-0">
+            QRZ.com: {% if qrz_configured %}configured{% else %}not configured — lookups and imports unavailable{% endif %}
+        </div>
+    </div>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Sending</h5></div>
+        <div class="card-body row g-3">
+            {% for field in form %}
+                {% if field.name == "from_name" or field.name == "reply_to_email" or field.name == "default_card_template" or field.name == "batch_size" or field.name == "delay_between_emails_s" %}
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">SMTP Email</h5>
+            <small class="text-muted">Blank fields fall back to the .env file</small>
+        </div>
+        <div class="card-body row g-3">
+            {% for field in form %}
+                {% if field.name == "smtp_host" or field.name == "smtp_port" or field.name == "smtp_use_tls" or field.name == "smtp_username" or field.name == "smtp_password" or field.name == "smtp_from_email" %}
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">QRZ.com</h5>
+            <small class="text-muted">Blank fields fall back to the .env file</small>
+        </div>
+        <div class="card-body row g-3">
+            {% for field in form %}
+                {% if field.name == "qrz_username" or field.name == "qrz_password" or field.name == "qrz_api_key" %}
+                <div class="col-md-4">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}<div class="text-danger small">{{ field.errors }}</div>{% endif %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save settings</button>
+</form>
+
+<hr class="my-4">
+
+<h5>Connection tests</h5>
+<div class="row g-3">
+    <div class="col-md-6">
+        <form method="post" action="{% url 'eqsl:test_email' %}" class="d-flex gap-2">
+            {% csrf_token %}
+            <input type="email" name="recipient" class="form-control" placeholder="Recipient (default: sender address)">
+            <button type="submit" class="btn btn-outline-primary text-nowrap">Send test email</button>
+        </form>
+    </div>
+    <div class="col-md-6">
+        <form method="post" action="{% url 'eqsl:test_qrz' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary">Test QRZ login</button>
+        </form>
+    </div>
+</div>
+
+<p class="text-muted small mt-4 mb-0">
+    Credentials entered here are stored unencrypted in the application database and take
+    precedence over the corresponding .env values.
+</p>
+{% endblock %}

@@ -21,7 +21,12 @@
                 <div class="display-6 text-warning">{{ needs_eqsl_count }}</div>
                 <div class="text-muted">Need eQSL</div>
             </div>
-            <a href="{% url 'eqsl:qso_list' %}?eqsl_status=needs" class="card-footer text-decoration-none">Open queue</a>
+            <div class="card-footer d-flex justify-content-between">
+                <a href="{% url 'eqsl:qso_list' %}?eqsl_status=needs" class="text-decoration-none">Open queue</a>
+                {% if needs_eqsl_count %}
+                <a href="{% url 'eqsl:batch_send' %}" class="text-decoration-none fw-bold">Send all…</a>
+                {% endif %}
+            </div>
         </div>
     </div>
     <div class="col-6 col-md-3">

@@ -1,16 +1,21 @@
 import io
+import logging
 
+from django import forms
 from django.contrib import messages
 from django.db.models import Count, Exists, OuterRef, Q
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import DetailView, ListView, TemplateView
+from django.views.generic import DetailView, ListView, TemplateView, UpdateView
 
 from .models import QSO, CardTemplate, EmailQSL, EmailTemplate, QSOQuerySet, SendingSettings
 from .render import RenderError, execute_render_code
-from .services import EQSLSendError, QRZAPIError, language_for_qso, send_eqsl
-from .tasks import enrich_missing_emails, enrich_qso
+from .services import QRZAPI, EQSLSendError, QRZAPIError, language_for_qso, send_eqsl
+from .tasks import enrich_missing_emails, enrich_qso, send_batch
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardView(TemplateView):
@@ -146,6 +151,164 @@ class SendEQSLView(View):
                 messages.error(request, f"Sending eQSL to {qso.call} failed: {email_qsl.error_message}")
 
         return redirect(request.POST.get("next") or "eqsl:qso_detail", pk=qso.pk)
+
+
+class SendingSettingsForm(forms.ModelForm):
+    """Form for the settings page, with masked credential inputs."""
+
+    class Meta:
+        model = SendingSettings
+        fields = [
+            "from_name",
+            "reply_to_email",
+            "default_card_template",
+            "batch_size",
+            "delay_between_emails_s",
+            "smtp_host",
+            "smtp_port",
+            "smtp_use_tls",
+            "smtp_username",
+            "smtp_password",
+            "smtp_from_email",
+            "qrz_username",
+            "qrz_password",
+            "qrz_api_key",
+        ]
+        widgets = {
+            "smtp_password": forms.PasswordInput(render_value=True),
+            "qrz_password": forms.PasswordInput(render_value=True),
+            "qrz_api_key": forms.PasswordInput(render_value=True),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            if isinstance(widget, forms.CheckboxInput):
+                widget.attrs.setdefault("class", "form-check-input")
+            elif isinstance(widget, forms.Select):
+                widget.attrs.setdefault("class", "form-select")
+            else:
+                widget.attrs.setdefault("class", "form-control")
+
+
+class SettingsView(UpdateView):
+    """Edit the application settings singleton."""
+
+    form_class = SendingSettingsForm
+    template_name = "eqsl/settings.html"
+    success_url = reverse_lazy("eqsl:settings")
+
+    def get_object(self, queryset=None):  # noqa: ARG002
+        return SendingSettings.get_settings()
+
+    def form_valid(self, form):
+        messages.success(self.request, "Settings saved.")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        smtp = self.object.effective_smtp()
+        qrz = self.object.effective_qrz()
+        context["smtp_configured"] = bool(smtp["from_email"] and smtp["host"])
+        context["qrz_configured"] = bool(qrz["username"] and qrz["password"])
+        return context
+
+
+class TestEmailView(View):
+    """Send a test email using the effective SMTP settings (POST only)."""
+
+    def post(self, request):
+        settings_obj = SendingSettings.get_settings()
+        smtp = settings_obj.effective_smtp()
+        recipient = request.POST.get("recipient") or smtp["from_email"]
+
+        if not smtp["from_email"]:
+            messages.error(request, "No sender address configured — fill in the SMTP section first.")
+            return redirect("eqsl:settings")
+
+        from django.core.mail import EmailMessage, get_connection
+
+        try:
+            connection = get_connection(
+                host=smtp["host"],
+                port=smtp["port"],
+                username=smtp["username"],
+                password=smtp["password"],
+                use_tls=smtp["use_tls"],
+            )
+            EmailMessage(
+                subject="QSL Web test email",
+                body="Your QSL Web SMTP settings work. 73!",
+                from_email=smtp["from_email"],
+                to=[recipient],
+                connection=connection,
+            ).send()
+        except Exception as e:
+            messages.error(request, f"Test email failed: {e}")
+        else:
+            messages.success(request, f"Test email sent to {recipient}.")
+        return redirect("eqsl:settings")
+
+
+class TestQRZView(View):
+    """Verify QRZ credentials by opening a session (POST only)."""
+
+    def post(self, request):
+        try:
+            info = QRZAPI().get_session_info()
+        except QRZAPIError as e:
+            messages.error(request, f"QRZ login failed: {e}")
+        else:
+            count = info.get("count", "?")
+            messages.success(request, f"QRZ login OK ({count} lookups used today).")
+        return redirect("eqsl:settings")
+
+
+class BatchSendView(TemplateView):
+    """Confirm and launch a batch eQSL send over the needs-eQSL queue."""
+
+    template_name = "eqsl/batch_confirm.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        settings_obj = SendingSettings.get_settings()
+        queue_count = QSO.objects.needs_eqsl().count()
+        context["queue_count"] = queue_count
+        context["batch_size"] = settings_obj.batch_size
+        context["delay"] = settings_obj.delay_between_emails_s
+        context["will_send"] = min(queue_count, settings_obj.batch_size)
+        context["remaining"] = max(0, queue_count - settings_obj.batch_size)
+        return context
+
+    def post(self, request):
+        queue_count = QSO.objects.needs_eqsl().count()
+        if not queue_count:
+            messages.info(request, "Nothing to send — the needs-eQSL queue is empty.")
+            return redirect("eqsl:home")
+
+        try:
+            from django_q.tasks import async_task
+
+            async_task("eqsl.tasks.send_batch")
+        except Exception as e:
+            # No broker available (e.g. Redis not running in dev): send inline
+            logger.warning(f"django-q2 broker unavailable ({e}); running batch synchronously")
+            summary = send_batch()
+            message = f"Batch finished: {summary['sent']} sent, {summary['failed']} failed"
+            if summary["errors"]:
+                messages.error(request, message + " — " + "; ".join(summary["errors"][:3]))
+            else:
+                messages.success(request, message)
+            return redirect("eqsl:eqsl_list")
+
+        settings_obj = SendingSettings.get_settings()
+        will_send = min(queue_count, settings_obj.batch_size)
+        messages.success(
+            request,
+            f"Batch of {will_send} eQSL(s) queued for sending (make sure the qcluster worker is running).",
+        )
+        return redirect("eqsl:eqsl_list")
 
 
 class EnrichQSOView(View):

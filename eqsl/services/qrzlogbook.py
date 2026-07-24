@@ -26,6 +26,13 @@ class QRZLogbookAPI:
 
     def __init__(self, api_key: str | None = None):
         """Initialize QRZ Logbook API client."""
+        if not api_key:
+            try:
+                from eqsl.models import SendingSettings
+
+                api_key = SendingSettings.get_settings().effective_qrz()["api_key"]
+            except Exception:
+                api_key = None
         self.api_key = api_key or settings.QRZ_API_KEY
         if not self.api_key:
             raise QRZLogbookAPIError("QRZ API key is required")

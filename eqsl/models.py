@@ -186,10 +186,28 @@ class EmailTemplate(models.Model):
 
 
 class SendingSettings(models.Model):
-    """Singleton settings for eQSL sending."""
+    """Singleton settings for eQSL sending and external service credentials.
+
+    Credential fields left blank fall back to the environment-based Django
+    settings (.env). Values are stored in plaintext in the database, which
+    is acceptable for this single-user, self-hosted application.
+    """
 
     from_name = models.CharField(max_length=100, default="Your Friendly Ham", help_text="Sender display name")
     reply_to_email = models.EmailField(blank=True, help_text="Reply-To address (optional)")
+
+    # SMTP configuration (blank = use .env)
+    smtp_host = models.CharField(max_length=255, blank=True, help_text="SMTP server (blank = use .env)")
+    smtp_port = models.PositiveIntegerField(null=True, blank=True, help_text="SMTP port (blank = use .env)")
+    smtp_use_tls = models.BooleanField(default=True, help_text="Use STARTTLS")
+    smtp_username = models.CharField(max_length=255, blank=True, help_text="SMTP username (blank = use .env)")
+    smtp_password = models.CharField(max_length=255, blank=True, help_text="SMTP password (blank = use .env)")
+    smtp_from_email = models.EmailField(blank=True, help_text="Sender email address (blank = use .env)")
+
+    # QRZ.com credentials (blank = use .env)
+    qrz_username = models.CharField(max_length=100, blank=True, help_text="QRZ.com username (blank = use .env)")
+    qrz_password = models.CharField(max_length=255, blank=True, help_text="QRZ.com password (blank = use .env)")
+    qrz_api_key = models.CharField(max_length=100, blank=True, help_text="QRZ Logbook API key (blank = use .env)")
     default_card_template = models.ForeignKey(
         CardTemplate,
         on_delete=models.SET_NULL,
@@ -220,6 +238,29 @@ class SendingSettings(models.Model):
         """Get or create the singleton settings instance."""
         settings, _ = cls.objects.get_or_create(pk=1)
         return settings
+
+    def effective_smtp(self):
+        """SMTP parameters with .env fallback for blank fields."""
+        from django.conf import settings as django_settings
+
+        return {
+            "host": self.smtp_host or django_settings.EMAIL_HOST,
+            "port": self.smtp_port or django_settings.EMAIL_PORT,
+            "use_tls": self.smtp_use_tls,
+            "username": self.smtp_username or django_settings.EMAIL_HOST_USER,
+            "password": self.smtp_password or django_settings.EMAIL_HOST_PASSWORD,
+            "from_email": self.smtp_from_email or django_settings.DEFAULT_FROM_EMAIL,
+        }
+
+    def effective_qrz(self):
+        """QRZ credentials with .env fallback for blank fields."""
+        from django.conf import settings as django_settings
+
+        return {
+            "username": self.qrz_username or django_settings.QRZ_USERNAME,
+            "password": self.qrz_password or django_settings.QRZ_PASSWORD,
+            "api_key": self.qrz_api_key or django_settings.QRZ_API_KEY,
+        }
 
 
 class QSOQuerySet(models.QuerySet):

@@ -3,7 +3,12 @@
 {% block title %}QSO List - QSL Web{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">QSO Log <span class="badge bg-secondary">{{ page_obj.paginator.count }} total</span></h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">QSO Log <span class="badge bg-secondary">{{ page_obj.paginator.count }} total</span></h2>
+    {% if current_eqsl_status == "needs" and page_obj.paginator.count %}
+        <a href="{% url 'eqsl:batch_send' %}" class="btn btn-primary">Send all&hellip;</a>
+    {% endif %}
+</div>
 
 <div class="card bg-light mb-4">
     <div class="card-body">

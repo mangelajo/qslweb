@@ -11,8 +11,7 @@ import logging
 import os
 import uuid
 
-from django.conf import settings
-from django.core.mail import EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template import Context, Template
 from django.utils.html import strip_tags
 
@@ -155,9 +154,10 @@ def send_eqsl(qso, card_template=None, email_template=None):
         EQSLSendError: If no recipient, card template, or email template is available
     """
     sending_settings = SendingSettings.get_settings()
+    smtp = sending_settings.effective_smtp()
 
-    if not settings.DEFAULT_FROM_EMAIL:
-        raise EQSLSendError("No sender address configured — set SMTP_FROM_EMAIL (and SMTP credentials) in your .env")
+    if not smtp["from_email"]:
+        raise EQSLSendError("No sender address configured — set it on the Settings page or via SMTP_FROM_EMAIL in .env")
 
     recipient = os.getenv("DEBUG_EMAIL") or qso.email
     if not recipient:
@@ -177,27 +177,35 @@ def send_eqsl(qso, card_template=None, email_template=None):
 
     subject, html_body, image_bytes, cid = compose_eqsl(qso, card_template, email_template)
 
-    from_email = settings.DEFAULT_FROM_EMAIL
+    from_email = smtp["from_email"]
     if sending_settings.from_name:
-        from_email = f"{sending_settings.from_name} <{settings.DEFAULT_FROM_EMAIL}>"
+        from_email = f"{sending_settings.from_name} <{smtp['from_email']}>"
 
     email_qsl = EmailQSL.objects.create(
         qso=qso,
         card_template=card_template,
         email_template=email_template,
         recipient_email=recipient,
-        sender_email=settings.DEFAULT_FROM_EMAIL,
+        sender_email=smtp["from_email"],
         subject=subject,
         body=html_body,
         delivery_status="pending",
     )
 
+    connection = get_connection(
+        host=smtp["host"],
+        port=smtp["port"],
+        username=smtp["username"],
+        password=smtp["password"],
+        use_tls=smtp["use_tls"],
+    )
     message = EmailMultiAlternatives(
         subject=subject,
         body=strip_tags(html_body),
         from_email=from_email,
         to=[recipient],
         reply_to=[sending_settings.reply_to_email] if sending_settings.reply_to_email else None,
+        connection=connection,
     )
     message.attach_alternative(html_body, "text/html")
     message.mixed_subtype = "related"
