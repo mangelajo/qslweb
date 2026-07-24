@@ -2,7 +2,12 @@
 Pytest configuration for qslweb project.
 """
 
+import os
+
 import pytest
+
+# Allow Django ORM calls while Playwright's event loop is running (UI tests)
+os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
 
 
 @pytest.fixture
