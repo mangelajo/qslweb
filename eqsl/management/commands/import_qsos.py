@@ -3,10 +3,8 @@ Management command to import QSOs from QRZ.com Logbook.
 """
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
 
-from eqsl.models import QSO
-from eqsl.services import QRZLogbookAPI, QRZLogbookAPIError
+from eqsl.services import QRZLogbookAPI, QRZLogbookAPIError, import_qso_dict
 
 
 class Command(BaseCommand):
@@ -110,23 +108,10 @@ class Command(BaseCommand):
         # Map QRZ data to our model
         qso_data = api.map_qso_to_model(qrz_qso)
 
-        # Check if QSO already exists (match by call, timestamp, and band)
-        existing = QSO.objects.filter(
-            call=qso_data["call"], timestamp=qso_data["timestamp"], band=qso_data["band"]
-        ).first()
-
-        if existing:
-            return "skipped"
-
-        if dry_run:
-            self.stdout.write(f"  Would import: {qso_data['call']} on {qso_data['band']} at {qso_data['timestamp']}")
-            return "imported"
-
-        # Create new QSO
-        with transaction.atomic():
-            QSO.objects.create(**qso_data)
+        result = import_qso_dict(qso_data, dry_run=dry_run)
+        if result == "imported":
+            verb = "Would import" if dry_run else "Imported"
             self.stdout.write(
-                self.style.SUCCESS(f"  Imported: {qso_data['call']} on {qso_data['band']} at {qso_data['timestamp']}")
+                self.style.SUCCESS(f"  {verb}: {qso_data['call']} on {qso_data['band']} at {qso_data['timestamp']}")
             )
-
-        return "imported"
+        return result

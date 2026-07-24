@@ -12,7 +12,15 @@ from django.views.generic import DetailView, ListView, TemplateView, UpdateView
 
 from .models import QSO, CardTemplate, EmailQSL, EmailTemplate, QSOQuerySet, SendingSettings
 from .render import RenderError, execute_render_code
-from .services import QRZAPI, EQSLSendError, QRZAPIError, language_for_qso, send_eqsl
+from .services import (
+    QRZAPI,
+    ADIFImportError,
+    EQSLSendError,
+    QRZAPIError,
+    import_adif_content,
+    language_for_qso,
+    send_eqsl,
+)
 from .tasks import enrich_missing_emails, enrich_qso, send_batch
 
 logger = logging.getLogger(__name__)
@@ -151,6 +159,39 @@ class SendEQSLView(View):
                 messages.error(request, f"Sending eQSL to {qso.call} failed: {email_qsl.error_message}")
 
         return redirect(request.POST.get("next") or "eqsl:qso_detail", pk=qso.pk)
+
+
+class ADIFImportView(TemplateView):
+    """Upload an ADIF file and import its QSOs."""
+
+    template_name = "eqsl/adif_import.html"
+
+    def post(self, request):
+        upload = request.FILES.get("adif_file")
+        if not upload:
+            messages.error(request, "Choose an ADIF file to upload.")
+            return redirect("eqsl:adif_import")
+
+        dry_run = bool(request.POST.get("dry_run"))
+        try:
+            content = upload.read().decode("utf-8", errors="replace")
+            summary = import_adif_content(content, dry_run=dry_run)
+        except ADIFImportError as e:
+            messages.error(request, str(e))
+            return redirect("eqsl:adif_import")
+
+        prefix = "Dry run: would import" if dry_run else "Imported"
+        message = f"{prefix} {summary['imported']} of {summary['total']} QSOs ({summary['skipped']} duplicates skipped)"
+        if summary["errors"]:
+            messages.warning(request, message + f" — {len(summary['errors'])} records had errors")
+            for error in summary["errors"][:5]:
+                messages.error(request, error)
+        else:
+            messages.success(request, message)
+
+        if dry_run:
+            return redirect("eqsl:adif_import")
+        return redirect("eqsl:qso_list")
 
 
 class SendingSettingsForm(forms.ModelForm):
